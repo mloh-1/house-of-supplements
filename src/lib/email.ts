@@ -1,11 +1,17 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const domain = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+  return new Resend(apiKey);
+}
 
 export async function sendVerificationEmail(email: string, token: string) {
+  const domain = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const confirmLink = `${domain}/verify-email?token=${token}`;
+  const resend = getResendClient();
 
   await resend.emails.send({
     from: process.env.EMAIL_FROM || "House of Supplements <noreply@resend.dev>",
@@ -91,7 +97,9 @@ export async function sendVerificationEmail(email: string, token: string) {
 }
 
 export async function sendPasswordResetEmail(email: string, token: string) {
+  const domain = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const resetLink = `${domain}/reset-password?token=${token}`;
+  const resend = getResendClient();
 
   await resend.emails.send({
     from: process.env.EMAIL_FROM || "House of Supplements <noreply@resend.dev>",
