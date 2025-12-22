@@ -7,6 +7,8 @@ import { CountdownTimer } from "@/components/home/countdown-timer";
 import { ProductCard } from "@/components/products/product-card";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const defaultHeroSlides = [
   {
     id: "1",

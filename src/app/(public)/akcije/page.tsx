@@ -3,6 +3,8 @@ import { Flame, Percent, Clock, Tag } from "lucide-react";
 import { ProductCard } from "@/components/products/product-card";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Akcije | House of Supplements",
   description: "Pogledajte sve proizvode na akciji. Iskoristite specijalne popuste na vrhunske suplemente.",

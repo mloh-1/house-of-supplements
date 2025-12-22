@@ -4,6 +4,8 @@ import { ChevronRight, Award } from "lucide-react";
 import { ProductCard } from "@/components/products/product-card";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 interface BrandPageProps {
   params: Promise<{ slug: string }>;
 }

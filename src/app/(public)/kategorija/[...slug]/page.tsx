@@ -3,6 +3,8 @@ import { ChevronRight, Zap } from "lucide-react";
 import { ProductCard } from "@/components/products/product-card";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 interface CategoryPageProps {
   params: Promise<{ slug: string[] }>;
 }
