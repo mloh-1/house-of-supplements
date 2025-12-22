@@ -95,9 +95,6 @@ export default async function BrandPage({ params }: BrandPageProps) {
             </span>
           </div>
           <h1 className="font-display text-4xl md:text-6xl text-white mb-3">{brand.name}</h1>
-          {brand.description && (
-            <p className="text-zinc-400 max-w-2xl text-lg">{brand.description}</p>
-          )}
         </div>
       </div>
 
