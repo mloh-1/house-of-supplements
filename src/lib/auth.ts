@@ -13,15 +13,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null;
+          throw new Error("Email i lozinka su obavezni");
         }
 
         const user = await db.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email: (credentials.email as string).toLowerCase() },
         });
 
         if (!user) {
-          return null;
+          throw new Error("Pogrešan email ili lozinka");
         }
 
         const isPasswordValid = await compare(
@@ -30,7 +30,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
 
         if (!isPasswordValid) {
-          return null;
+          throw new Error("Pogrešan email ili lozinka");
+        }
+
+        // Check if email is verified
+        if (!user.emailVerified) {
+          throw new Error("Molimo potvrdite vašu email adresu pre prijave");
         }
 
         return {

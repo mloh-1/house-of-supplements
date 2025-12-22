@@ -129,10 +129,10 @@ export function Footer() {
             </h4>
             <ul className="space-y-3">
               {[
-                { href: "/kategorija/proteini", label: "Proteini" },
-                { href: "/kategorija/aminokiseline", label: "Aminokiseline" },
-                { href: "/kategorija/kreatin", label: "Kreatin" },
-                { href: "/kategorija/vitamini", label: "Vitamini" },
+                { href: "/proizvodi?kategorija=proteini", label: "Proteini" },
+                { href: "/proizvodi?kategorija=aminokiseline", label: "Aminokiseline" },
+                { href: "/proizvodi?kategorija=kreatin", label: "Kreatin" },
+                { href: "/proizvodi?kategorija=vitamini", label: "Vitamini" },
                 { href: "/akcije", label: "Akcije", highlight: true },
               ].map((link) => (
                 <li key={link.href}>

@@ -1,12 +1,15 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Heart, ShoppingCart, Eye, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice, calculateDiscount } from "@/lib/utils";
 import { useCartStore } from "@/store/cart";
+import { useWishlistStore } from "@/store/wishlist";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +31,15 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
+  const [mounted, setMounted] = useState(false);
+  const { data: session, status } = useSession();
   const addItem = useCartStore((state) => state.addItem);
+  const addToWishlist = useWishlistStore((state) => state.addItem);
+  const removeFromWishlist = useWishlistStore((state) => state.removeItem);
+  const isInWishlist = useWishlistStore((state) => state.isInWishlist);
+
+  const isLoggedIn = status === "authenticated" && session?.user;
+
   const discount =
     product.salePrice && product.salePrice < product.price
       ? calculateDiscount(product.price, product.salePrice)
@@ -36,6 +47,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
   const isOutOfStock = product.stock <= 0;
   const isLowStock = product.stock > 0 && product.stock <= 5;
+  const inWishlist = mounted && isLoggedIn && isInWishlist(product.id);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -56,6 +72,32 @@ export function ProductCard({ product, className }: ProductCardProps) {
       title: "Dodato u korpu",
       description: `${product.name} je dodat u vašu korpu.`,
     });
+  };
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (inWishlist) {
+      removeFromWishlist(product.id);
+      toast({
+        title: "Uklonjeno sa liste želja",
+        description: `${product.name} je uklonjen sa vaše liste želja.`,
+      });
+    } else {
+      addToWishlist({
+        productId: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: product.price,
+        salePrice: product.salePrice || undefined,
+        image: product.images[0] || "/placeholder.jpg",
+      });
+      toast({
+        title: "Dodato na listu želja",
+        description: `${product.name} je dodat na vašu listu želja.`,
+      });
+    }
   };
 
   return (
@@ -101,12 +143,20 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
           {/* Quick actions */}
           <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0">
-            <Button
-              size="icon"
-              className="h-9 w-9 bg-zinc-800/90 hover:bg-lime hover:text-black text-zinc-300 rounded-none border border-zinc-700"
-            >
-              <Heart className="h-4 w-4" />
-            </Button>
+            {isLoggedIn && (
+              <Button
+                size="icon"
+                onClick={handleWishlist}
+                className={cn(
+                  "h-9 w-9 rounded-none border",
+                  inWishlist
+                    ? "bg-lime text-black border-lime hover:bg-lime-500"
+                    : "bg-zinc-800/90 hover:bg-lime hover:text-black text-zinc-300 border-zinc-700"
+                )}
+              >
+                <Heart className={cn("h-4 w-4", inWishlist && "fill-current")} />
+              </Button>
+            )}
             <Button
               size="icon"
               className="h-9 w-9 bg-zinc-800/90 hover:bg-lime hover:text-black text-zinc-300 rounded-none border border-zinc-700"

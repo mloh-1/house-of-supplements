@@ -8,18 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
 import { useCartStore } from "@/store/cart";
-
-const FREE_SHIPPING_MIN = 4000;
-const SHIPPING_COST = 350;
+import { useSettings } from "@/context/settings-context";
 
 export default function CartPage() {
   const [mounted, setMounted] = useState(false);
+  const { settings } = useSettings();
   const { items, removeItem, updateQuantity, getTotal, clearCart } =
     useCartStore();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const FREE_SHIPPING_MIN = settings.freeShippingMin;
+  const SHIPPING_COST = settings.shippingCost;
 
   if (!mounted) {
     return (
@@ -151,9 +153,9 @@ export default function CartPage() {
                         >
                           {item.name}
                         </Link>
-                        {item.variant && (
+                        {item.variantInfo && (
                           <p className="text-sm text-zinc-500 mt-1">
-                            {item.variant.name}: <span className="text-zinc-400">{item.variant.value}</span>
+                            <span className="text-zinc-400">{item.variantInfo}</span>
                           </p>
                         )}
                       </div>
@@ -266,7 +268,7 @@ export default function CartPage() {
 
               <Link href="/checkout">
                 <button className="w-full bg-lime text-black font-bold py-4 uppercase tracking-wider hover:bg-lime-400 transition-colors flex items-center justify-center gap-2 text-lg">
-                  Nastavi na plaćanje
+                  Nastavi na porudžbinu
                   <ArrowRight className="h-5 w-5" />
                 </button>
               </Link>

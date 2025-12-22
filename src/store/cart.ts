@@ -9,10 +9,7 @@ export interface CartItem {
   salePrice?: number;
   image: string;
   quantity: number;
-  variant?: {
-    name: string;
-    value: string;
-  };
+  variantInfo?: string;
 }
 
 interface CartState {
@@ -35,7 +32,7 @@ export const useCartStore = create<CartState>()(
         const existingItemIndex = items.findIndex(
           (i) =>
             i.productId === item.productId &&
-            i.variant?.value === item.variant?.value
+            i.variantInfo === item.variantInfo
         );
 
         if (existingItemIndex > -1) {
@@ -43,7 +40,7 @@ export const useCartStore = create<CartState>()(
           newItems[existingItemIndex].quantity += item.quantity;
           set({ items: newItems });
         } else {
-          const id = `${item.productId}-${item.variant?.value || "default"}-${Date.now()}`;
+          const id = `${item.productId}-${item.variantInfo || "default"}-${Date.now()}`;
           set({ items: [...items, { ...item, id }] });
         }
       },

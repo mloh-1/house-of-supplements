@@ -1,24 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, LogIn, Zap } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const verified = searchParams.get("verified") === "true";
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(verified ? "Email uspešno potvrđen! Sada možete da se prijavite." : "");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Demo: simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    router.push("/admin");
-    setIsLoading(false);
+    setError("");
+    setSuccess("");
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        // Show the actual error message from auth
+        setError(result.error === "CredentialsSignin"
+          ? "Pogrešan email ili lozinka"
+          : result.error);
+      } else {
+        router.push(callbackUrl);
+        router.refresh();
+      }
+    } catch {
+      setError("Došlo je do greške. Pokušajte ponovo.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -61,6 +89,17 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {success && (
+              <div className="bg-lime/20 border border-lime/30 text-lime px-4 py-3 text-sm">
+                {success}
+              </div>
+            )}
+            {error && (
+              <div className="bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-3 text-sm">
+                {error}
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="block text-sm font-bold text-zinc-400 mb-2 uppercase tracking-wider">
                 Email adresa
@@ -68,6 +107,8 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="vas@email.com"
                 className="w-full bg-black border-zinc-700 text-white placeholder:text-zinc-600 focus:border-lime h-12"
                 required
@@ -82,6 +123,8 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="w-full bg-black border-zinc-700 text-white placeholder:text-zinc-600 focus:border-lime h-12 pr-12"
                   required
@@ -151,5 +194,17 @@ export default function LoginPage() {
         <div className="h-1 bg-gradient-to-r from-transparent via-lime to-transparent opacity-50" />
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-2 border-lime border-t-transparent rounded-full" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

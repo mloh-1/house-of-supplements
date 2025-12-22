@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,29 +17,85 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { slugify } from "@/lib/utils";
 
-const categories = [
-  { id: "1", name: "Proteini", slug: "proteini" },
-  { id: "2", name: "Aminokiseline", slug: "aminokiseline" },
-  { id: "3", name: "Kreatin", slug: "kreatin" },
-  { id: "4", name: "Vitamini", slug: "vitamini" },
-  { id: "5", name: "Pre-Workout", slug: "pre-workout" },
-];
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
 
-const brands = [
-  { id: "1", name: "BioTech USA" },
-  { id: "2", name: "Optimum Nutrition" },
-  { id: "3", name: "MyProtein" },
-  { id: "4", name: "Ultimate Nutrition" },
-  { id: "5", name: "VemoHerb" },
-];
+interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 export default function NewProductPage() {
-  const [variants, setVariants] = useState<{ name: string; value: string }[]>(
-    []
-  );
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const [formData, setFormData] = useState({
+    name: "",
+    slug: "",
+    shortDesc: "",
+    description: "",
+    price: "",
+    salePrice: "",
+    sku: "",
+    stock: "0",
+    categoryId: "",
+    newCategoryName: "",
+    brandId: "",
+    newBrandName: "",
+    active: true,
+    featured: false,
+  });
+
+  const [categoryMode, setCategoryMode] = useState<"existing" | "new">("existing");
+  const [brandMode, setBrandMode] = useState<"existing" | "new">("existing");
+
+  const [variants, setVariants] = useState<{ name: string; value: string }[]>([]);
   const [images, setImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchCategoriesAndBrands();
+  }, []);
+
+  const fetchCategoriesAndBrands = async () => {
+    try {
+      const [catRes, brandRes] = await Promise.all([
+        fetch("/api/categories"),
+        fetch("/api/brands"),
+      ]);
+
+      if (catRes.ok) {
+        const catData = await catRes.json();
+        setCategories(catData);
+      }
+      if (brandRes.ok) {
+        const brandData = await brandRes.json();
+        setBrands(brandData);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "name" && !formData.slug ? { slug: slugify(value) } : {}),
+    }));
+  };
 
   const addVariant = () => {
     setVariants([...variants, { name: "", value: "" }]);
@@ -48,93 +105,186 @@ export default function NewProductPage() {
     setVariants(variants.filter((_, i) => i !== index));
   };
 
-  const updateVariant = (
-    index: number,
-    field: "name" | "value",
-    value: string
-  ) => {
+  const updateVariant = (index: number, field: "name" | "value", value: string) => {
     const newVariants = [...variants];
     newVariants[index][field] = value;
     setVariants(newVariants);
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+
+    const hasCategory = categoryMode === "existing" ? formData.categoryId : formData.newCategoryName;
+    if (!formData.name || !formData.price || !hasCategory) {
+      setError("Naziv, cena i kategorija su obavezni");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const submitData = {
+        ...formData,
+        images: JSON.stringify(images),
+        categoryId: categoryMode === "existing" ? formData.categoryId : "",
+        newCategoryName: categoryMode === "new" ? formData.newCategoryName : "",
+        brandId: brandMode === "existing" ? formData.brandId : "",
+        newBrandName: brandMode === "new" ? formData.newBrandName : "",
+        variants: variants.filter(v => v.name && v.value),
+      };
+
+      const response = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(submitData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Došlo je do greške");
+        setSaving(false);
+        return;
+      }
+
+      router.push("/admin/proizvodi");
+    } catch {
+      setError("Došlo je do greške. Pokušajte ponovo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 bg-zinc-800 w-48 animate-pulse" />
+        <div className="bg-zinc-900 border border-zinc-800 h-96 animate-pulse" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/admin/proizvodi">
-          <Button variant="ghost" size="icon">
+          <button className="p-2 text-zinc-500 hover:text-lime transition-colors">
             <ArrowLeft className="h-5 w-5" />
-          </Button>
+          </button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Novi proizvod</h1>
-          <p className="text-navy-600">Dodajte novi proizvod u prodavnicu</p>
+          <h1 className="font-display text-2xl text-white">NOVI PROIZVOD</h1>
+          <p className="text-zinc-500">Dodajte novi proizvod u prodavnicu</p>
         </div>
       </div>
 
-      <form className="grid lg:grid-cols-3 gap-6">
+      {error && (
+        <div className="bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-3">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {/* Basic info */}
-          <Card>
+          <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle>Osnovne informacije</CardTitle>
+              <CardTitle className="text-white">Osnovne informacije</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="name">Naziv proizvoda *</Label>
+                <Label htmlFor="name" className="text-zinc-400">Naziv proizvoda *</Label>
                 <Input
                   id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
                   placeholder="npr. 100% Pure Whey 2270g"
-                  className="mt-1"
+                  className="mt-1 bg-black border-zinc-700 text-white"
+                  required
                 />
               </div>
 
               <div>
-                <Label htmlFor="slug">URL slug</Label>
+                <Label htmlFor="slug" className="text-zinc-400">URL slug</Label>
                 <Input
                   id="slug"
+                  name="slug"
+                  value={formData.slug}
+                  onChange={handleChange}
                   placeholder="automatski se generiše iz naziva"
-                  className="mt-1"
+                  className="mt-1 bg-black border-zinc-700 text-white"
                 />
               </div>
 
               <div>
-                <Label htmlFor="shortDesc">Kratak opis</Label>
+                <Label htmlFor="shortDesc" className="text-zinc-400">Kratak opis</Label>
                 <Input
                   id="shortDesc"
+                  name="shortDesc"
+                  value={formData.shortDesc}
+                  onChange={handleChange}
                   placeholder="Kratak opis proizvoda (do 160 karaktera)"
-                  className="mt-1"
+                  className="mt-1 bg-black border-zinc-700 text-white"
                 />
               </div>
 
               <div>
-                <Label htmlFor="description">Opis proizvoda</Label>
+                <Label htmlFor="description" className="text-zinc-400">Opis proizvoda</Label>
                 <Textarea
                   id="description"
-                  placeholder="Detaljan opis proizvoda... Možete koristiti HTML za formatiranje."
-                  className="mt-1 min-h-[200px]"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Detaljan opis proizvoda..."
+                  className="mt-1 min-h-[200px] bg-black border-zinc-700 text-white"
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Images */}
-          <Card>
+          <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle>Slike proizvoda</CardTitle>
+              <CardTitle className="text-white">Slike proizvoda</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <Upload className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-                <p className="text-navy-600 mb-2">
-                  Prevucite slike ovde ili kliknite za upload
+              <div className="border-2 border-dashed border-zinc-700 p-8 text-center">
+                <Upload className="h-10 w-10 text-zinc-600 mx-auto mb-4" />
+                <p className="text-zinc-400 mb-2">
+                  Unesite URL slike ispod
                 </p>
-                <p className="text-sm text-navy-500">
-                  PNG, JPG ili WEBP. Maksimalno 5MB po slici.
-                </p>
-                <Button variant="outline" className="mt-4">
-                  Izaberite slike
-                </Button>
+                <div className="flex gap-2 max-w-md mx-auto">
+                  <Input
+                    placeholder="https://example.com/image.jpg"
+                    className="bg-black border-zinc-700 text-white"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const input = e.target as HTMLInputElement;
+                        if (input.value) {
+                          setImages([...images, input.value]);
+                          input.value = "";
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-zinc-700 text-zinc-300"
+                    onClick={() => {
+                      const input = document.querySelector('input[placeholder="https://example.com/image.jpg"]') as HTMLInputElement;
+                      if (input?.value) {
+                        setImages([...images, input.value]);
+                        input.value = "";
+                      }
+                    }}
+                  >
+                    Dodaj
+                  </Button>
+                </div>
               </div>
 
               {images.length > 0 && (
@@ -142,7 +292,7 @@ export default function NewProductPage() {
                   {images.map((image, index) => (
                     <div
                       key={index}
-                      className="relative aspect-square rounded-lg overflow-hidden bg-gray-100"
+                      className="relative aspect-square bg-black border border-zinc-800 overflow-hidden"
                     >
                       <img
                         src={image}
@@ -151,10 +301,8 @@ export default function NewProductPage() {
                       />
                       <button
                         type="button"
-                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"
-                        onClick={() =>
-                          setImages(images.filter((_, i) => i !== index))
-                        }
+                        className="absolute top-2 right-2 bg-red-500 text-white p-1"
+                        onClick={() => setImages(images.filter((_, i) => i !== index))}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -166,17 +314,17 @@ export default function NewProductPage() {
           </Card>
 
           {/* Variants */}
-          <Card>
+          <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Varijante proizvoda</CardTitle>
-              <Button type="button" variant="outline" size="sm" onClick={addVariant}>
+              <CardTitle className="text-white">Varijante proizvoda</CardTitle>
+              <Button type="button" variant="outline" size="sm" onClick={addVariant} className="border-zinc-700 text-zinc-300">
                 <Plus className="h-4 w-4 mr-2" />
                 Dodaj varijantu
               </Button>
             </CardHeader>
             <CardContent>
               {variants.length === 0 ? (
-                <p className="text-center text-navy-500 py-8">
+                <p className="text-center text-zinc-500 py-8">
                   Nema dodatih varijanti. Kliknite &quot;Dodaj varijantu&quot;
                   za proizvode koji imaju različite ukuse, veličine, itd.
                 </p>
@@ -185,28 +333,24 @@ export default function NewProductPage() {
                   {variants.map((variant, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
+                      className="flex items-center gap-4 p-4 bg-black border border-zinc-800"
                     >
                       <div className="flex-1">
-                        <Label>Naziv varijante (npr. Ukus, Veličina)</Label>
+                        <Label className="text-zinc-400">Naziv varijante</Label>
                         <Input
                           value={variant.name}
-                          onChange={(e) =>
-                            updateVariant(index, "name", e.target.value)
-                          }
+                          onChange={(e) => updateVariant(index, "name", e.target.value)}
                           placeholder="npr. Ukus"
-                          className="mt-1"
+                          className="mt-1 bg-zinc-900 border-zinc-700 text-white"
                         />
                       </div>
                       <div className="flex-1">
-                        <Label>Vrednosti (razdvojene zarezom)</Label>
+                        <Label className="text-zinc-400">Vrednosti</Label>
                         <Input
                           value={variant.value}
-                          onChange={(e) =>
-                            updateVariant(index, "value", e.target.value)
-                          }
-                          placeholder="npr. Čokolada, Vanila, Jagoda"
-                          className="mt-1"
+                          onChange={(e) => updateVariant(index, "value", e.target.value)}
+                          placeholder="npr. Čokolada, Vanila"
+                          className="mt-1 bg-zinc-900 border-zinc-700 text-white"
                         />
                       </div>
                       <Button
@@ -229,108 +373,218 @@ export default function NewProductPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Status */}
-          <Card>
+          <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle>Status</CardTitle>
+              <CardTitle className="text-white">Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2">
-                <Checkbox id="active" defaultChecked />
-                <Label htmlFor="active">Aktivan proizvod</Label>
+                <Checkbox
+                  id="active"
+                  checked={formData.active}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, active: !!checked }))}
+                  className="border-zinc-600 data-[state=checked]:bg-lime data-[state=checked]:border-lime"
+                />
+                <Label htmlFor="active" className="text-zinc-300">Aktivan proizvod</Label>
               </div>
               <div className="flex items-center gap-2">
-                <Checkbox id="featured" />
-                <Label htmlFor="featured">Istaknut proizvod</Label>
+                <Checkbox
+                  id="featured"
+                  checked={formData.featured}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, featured: !!checked }))}
+                  className="border-zinc-600 data-[state=checked]:bg-lime data-[state=checked]:border-lime"
+                />
+                <Label htmlFor="featured" className="text-zinc-300">Istaknut proizvod</Label>
               </div>
             </CardContent>
           </Card>
 
           {/* Organization */}
-          <Card>
+          <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle>Organizacija</CardTitle>
+              <CardTitle className="text-white">Organizacija</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Kategorija *</Label>
-                <Select>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Izaberite kategoriju" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-zinc-400">Kategorija *</Label>
+                <div className="flex gap-2 mt-1 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryMode("existing")}
+                    className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${
+                      categoryMode === "existing"
+                        ? "bg-lime text-black"
+                        : "bg-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Postojeća
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryMode("new")}
+                    className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${
+                      categoryMode === "new"
+                        ? "bg-lime text-black"
+                        : "bg-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    + Nova
+                  </button>
+                </div>
+                {categoryMode === "existing" ? (
+                  <Select
+                    value={formData.categoryId}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, categoryId: value }))}
+                  >
+                    <SelectTrigger className="bg-black border-zinc-700 text-zinc-300">
+                      <SelectValue placeholder="Izaberite kategoriju" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-700">
+                      {categories.map((category) => (
+                        <SelectItem
+                          key={category.id}
+                          value={category.id}
+                          className="text-zinc-300 focus:bg-lime focus:text-black"
+                        >
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={formData.newCategoryName}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, newCategoryName: e.target.value }))}
+                    placeholder="Unesite naziv nove kategorije"
+                    className="bg-black border-zinc-700 text-white"
+                  />
+                )}
               </div>
 
               <div>
-                <Label>Brend</Label>
-                <Select>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Izaberite brend" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {brands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
+                <Label className="text-zinc-400">Brend</Label>
+                <div className="flex gap-2 mt-1 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setBrandMode("existing")}
+                    className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${
+                      brandMode === "existing"
+                        ? "bg-lime text-black"
+                        : "bg-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Postojeći
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBrandMode("new")}
+                    className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${
+                      brandMode === "new"
+                        ? "bg-lime text-black"
+                        : "bg-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    + Novi
+                  </button>
+                </div>
+                {brandMode === "existing" ? (
+                  <Select
+                    value={formData.brandId || "none"}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, brandId: value === "none" ? "" : value }))}
+                  >
+                    <SelectTrigger className="bg-black border-zinc-700 text-zinc-300">
+                      <SelectValue placeholder="Izaberite brend" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-700">
+                      <SelectItem value="none" className="text-zinc-500 focus:bg-lime focus:text-black">
+                        Bez brenda
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      {brands.map((brand) => (
+                        <SelectItem
+                          key={brand.id}
+                          value={brand.id}
+                          className="text-zinc-300 focus:bg-lime focus:text-black"
+                        >
+                          {brand.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={formData.newBrandName}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, newBrandName: e.target.value }))}
+                    placeholder="Unesite naziv novog brenda"
+                    className="bg-black border-zinc-700 text-white"
+                  />
+                )}
               </div>
 
               <div>
-                <Label htmlFor="sku">SKU (šifra proizvoda)</Label>
-                <Input id="sku" placeholder="npr. BT-PW-2270" className="mt-1" />
+                <Label htmlFor="sku" className="text-zinc-400">SKU (šifra proizvoda)</Label>
+                <Input
+                  id="sku"
+                  name="sku"
+                  value={formData.sku}
+                  onChange={handleChange}
+                  placeholder="npr. BT-PW-2270"
+                  className="mt-1 bg-black border-zinc-700 text-white"
+                />
               </div>
             </CardContent>
           </Card>
 
           {/* Pricing */}
-          <Card>
+          <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle>Cena</CardTitle>
+              <CardTitle className="text-white">Cena</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="price">Regularna cena (RSD) *</Label>
+                <Label htmlFor="price" className="text-zinc-400">Regularna cena (RSD) *</Label>
                 <Input
                   id="price"
+                  name="price"
                   type="number"
-                  placeholder="0.00"
-                  className="mt-1"
+                  value={formData.price}
+                  onChange={handleChange}
+                  placeholder="0"
+                  className="mt-1 bg-black border-zinc-700 text-white"
+                  required
                 />
               </div>
 
               <div>
-                <Label htmlFor="salePrice">Akcijska cena (RSD)</Label>
+                <Label htmlFor="salePrice" className="text-zinc-400">Akcijska cena (RSD)</Label>
                 <Input
                   id="salePrice"
+                  name="salePrice"
                   type="number"
-                  placeholder="0.00"
-                  className="mt-1"
+                  value={formData.salePrice}
+                  onChange={handleChange}
+                  placeholder="0"
+                  className="mt-1 bg-black border-zinc-700 text-white"
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Inventory */}
-          <Card>
+          <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-              <CardTitle>Zalihe</CardTitle>
+              <CardTitle className="text-white">Zalihe</CardTitle>
             </CardHeader>
             <CardContent>
               <div>
-                <Label htmlFor="stock">Količina na stanju</Label>
+                <Label htmlFor="stock" className="text-zinc-400">Količina na stanju</Label>
                 <Input
                   id="stock"
+                  name="stock"
                   type="number"
+                  value={formData.stock}
+                  onChange={handleChange}
                   placeholder="0"
-                  className="mt-1"
+                  className="mt-1 bg-black border-zinc-700 text-white"
                 />
               </div>
             </CardContent>
@@ -338,12 +592,16 @@ export default function NewProductPage() {
 
           {/* Actions */}
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" asChild>
+            <Button variant="outline" className="flex-1 border-zinc-700 text-zinc-300" asChild>
               <Link href="/admin/proizvodi">Otkaži</Link>
             </Button>
-            <Button variant="accent" className="flex-1">
-              Sačuvaj proizvod
-            </Button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-lime text-black font-bold py-2 uppercase tracking-wider hover:bg-lime-400 transition-colors disabled:opacity-50"
+            >
+              {saving ? "Čuvanje..." : "Sačuvaj"}
+            </button>
           </div>
         </div>
       </form>

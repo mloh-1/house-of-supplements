@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database...");
 
-  // Create admin user
+  // Create admin user (original)
   const adminPassword = await hash("admin123", 12);
   const admin = await prisma.user.upsert({
     where: { email: "admin@houseofsupplements.rs" },
@@ -19,6 +19,20 @@ async function main() {
     },
   });
   console.log("✅ Created admin user:", admin.email);
+
+  // Create test admin user
+  const testAdminPassword = await hash("1234", 12);
+  const testAdmin = await prisma.user.upsert({
+    where: { email: "nikolagymnastics@gmail.com" },
+    update: {},
+    create: {
+      email: "nikolagymnastics@gmail.com",
+      password: testAdminPassword,
+      name: "Nikola Admin",
+      role: "ADMIN",
+    },
+  });
+  console.log("✅ Created test admin user:", testAdmin.email);
 
   // Create site settings
   await prisma.siteSettings.upsert({

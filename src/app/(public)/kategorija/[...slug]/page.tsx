@@ -1,139 +1,120 @@
 import Link from "next/link";
-import { ChevronRight, Filter, Zap } from "lucide-react";
+import { ChevronRight, Zap } from "lucide-react";
 import { ProductCard } from "@/components/products/product-card";
-import { CategoryFilters } from "@/components/category/category-filters";
-
-// Demo data
-const allProducts = [
-  {
-    id: "1",
-    name: "100% Pure Whey 2270g",
-    slug: "100-pure-whey-2270g",
-    price: 7250,
-    salePrice: 6100,
-    images: [
-      "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=80",
-    ],
-    category: { name: "Whey Protein", slug: "whey-protein" },
-    stock: 15,
-  },
-  {
-    id: "2",
-    name: "100% Pure Whey 1000g",
-    slug: "100-pure-whey-1000g",
-    price: 3650,
-    images: [
-      "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=80",
-    ],
-    category: { name: "Whey Protein", slug: "whey-protein" },
-    stock: 20,
-  },
-  {
-    id: "3",
-    name: "Whey Izolat Premium 1000g",
-    slug: "whey-izolat-premium-1000g",
-    price: 4500,
-    images: [
-      "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=80",
-    ],
-    category: { name: "Whey Izolat", slug: "whey-izolat" },
-    stock: 12,
-  },
-  {
-    id: "4",
-    name: "Kazein Protein 900g",
-    slug: "kazein-protein-900g",
-    price: 3900,
-    salePrice: 3500,
-    images: [
-      "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=80",
-    ],
-    category: { name: "Kazein", slug: "kazein" },
-    stock: 8,
-  },
-  {
-    id: "5",
-    name: "Veganski Protein 750g",
-    slug: "veganski-protein-750g",
-    price: 3200,
-    images: [
-      "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=80",
-    ],
-    category: { name: "Veganski Proteini", slug: "veganski-proteini" },
-    stock: 5,
-  },
-  {
-    id: "6",
-    name: "Beef Protein Izolat 1800g",
-    slug: "beef-protein-izolat-1800g",
-    price: 5500,
-    images: [
-      "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&q=80",
-    ],
-    category: { name: "Beef Protein", slug: "beef-protein" },
-    stock: 0,
-  },
-  {
-    id: "7",
-    name: "BCAA Powder 300g",
-    slug: "bcaa-powder-300g",
-    price: 2100,
-    images: [
-      "https://images.unsplash.com/photo-1579722820308-d74e571900a9?w=400&q=80",
-    ],
-    category: { name: "BCAA", slug: "bcaa" },
-    stock: 25,
-  },
-  {
-    id: "8",
-    name: "EAA Complex 400g",
-    slug: "eaa-complex-400g",
-    price: 2800,
-    salePrice: 2400,
-    images: [
-      "https://images.unsplash.com/photo-1579722820308-d74e571900a9?w=400&q=80",
-    ],
-    category: { name: "EAA", slug: "eaa" },
-    stock: 18,
-  },
-];
-
-const categories = [
-  {
-    name: "Proteini",
-    slug: "proteini",
-    description: "Proteini u prahu postali su popularni među sportistima, bodybuilderima i osobama koje žele da poboljšaju svoju ishranu i postignu određene fizičke ciljeve.",
-    subcategories: [
-      { name: "Whey Protein", slug: "whey-protein", count: 24 },
-      { name: "Whey Izolat", slug: "whey-izolat", count: 18 },
-      { name: "Kazein", slug: "kazein", count: 12 },
-      { name: "Veganski Proteini", slug: "veganski-proteini", count: 8 },
-      { name: "Beef Protein", slug: "beef-protein", count: 6 },
-    ],
-  },
-  {
-    name: "Aminokiseline",
-    slug: "aminokiseline",
-    description: "Aminokiseline su gradivni blokovi proteina i esencijalne su za oporavak i rast mišića.",
-    subcategories: [
-      { name: "BCAA", slug: "bcaa", count: 15 },
-      { name: "EAA", slug: "eaa", count: 10 },
-      { name: "Glutamin", slug: "glutamin", count: 8 },
-      { name: "L-Karnitin", slug: "l-karnitin", count: 12 },
-    ],
-  },
-];
-
-const brands = [
-  { name: "BioTech USA", slug: "biotech-usa", count: 45 },
-  { name: "Optimum Nutrition", slug: "optimum-nutrition", count: 32 },
-  { name: "MyProtein", slug: "myprotein", count: 28 },
-  { name: "VemoHerb", slug: "vemoherb", count: 15 },
-  { name: "Ultimate Nutrition", slug: "ultimate-nutrition", count: 22 },
-];
+import { db } from "@/lib/db";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string[] }>;
+}
+
+function parseImages(images: string): string[] {
+  try {
+    const parsed = JSON.parse(images);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function getCategory(slug: string) {
+  return db.category.findUnique({
+    where: { slug },
+    include: {
+      children: true,
+      parent: true,
+    },
+  });
+}
+
+async function getProducts(categorySlug: string, subcategorySlug?: string) {
+  // If we have a subcategory, find products in that subcategory
+  if (subcategorySlug) {
+    const subcategory = await db.category.findFirst({
+      where: {
+        slug: subcategorySlug,
+        parent: { slug: categorySlug },
+      },
+    });
+
+    if (subcategory) {
+      const products = await db.product.findMany({
+        where: {
+          active: true,
+          categoryId: subcategory.id,
+        },
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+        },
+        orderBy: [
+          { featured: "desc" },
+          { createdAt: "desc" },
+        ],
+      });
+      return products.map(product => ({
+        ...product,
+        images: parseImages(product.images),
+      }));
+    }
+  }
+
+  // Otherwise, find products in the main category or any of its subcategories
+  const category = await db.category.findUnique({
+    where: { slug: categorySlug },
+    include: { children: true },
+  });
+
+  if (!category) {
+    return [];
+  }
+
+  const categoryIds = [category.id, ...category.children.map((c) => c.id)];
+
+  const products = await db.product.findMany({
+    where: {
+      active: true,
+      categoryId: { in: categoryIds },
+    },
+    include: {
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
+    },
+    orderBy: [
+      { featured: "desc" },
+      { createdAt: "desc" },
+    ],
+  });
+
+  return products.map(product => ({
+    ...product,
+    images: parseImages(product.images),
+  }));
+}
+
+async function getAllCategories() {
+  return db.category.findMany({
+    where: { parentId: null },
+    include: {
+      children: true,
+    },
+    orderBy: { name: "asc" },
+  });
+}
+
+async function getAllBrands() {
+  return db.brand.findMany({
+    orderBy: { name: "asc" },
+  });
 }
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
@@ -141,16 +122,20 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const categorySlug = slug[0];
   const subcategorySlug = slug[1];
 
-  const category = categories.find((c) => c.slug === categorySlug);
-  const subcategory = category?.subcategories.find(
-    (s) => s.slug === subcategorySlug
-  );
+  const [category, products, allCategories, allBrands] = await Promise.all([
+    getCategory(categorySlug),
+    getProducts(categorySlug, subcategorySlug),
+    getAllCategories(),
+    getAllBrands(),
+  ]);
+
+  // Find subcategory if applicable
+  const subcategory = subcategorySlug
+    ? category?.children.find((c) => c.slug === subcategorySlug)
+    : null;
 
   const title = subcategory?.name || category?.name || "Svi proizvodi";
   const description = category?.description || "";
-
-  // Filter products based on category/subcategory
-  const filteredProducts = allProducts;
 
   return (
     <div className="bg-zinc-950 min-h-screen">
@@ -211,19 +196,76 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar */}
           <aside className="lg:w-72 flex-shrink-0">
-            <CategoryFilters
-              categories={categories}
-              brands={brands}
-              currentCategory={categorySlug}
-              currentSubcategory={subcategorySlug}
-            />
+            <div className="bg-zinc-900 border border-zinc-800 p-6 sticky top-24">
+              {/* Categories */}
+              <div className="mb-8">
+                <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <span className="text-lime">//</span> Kategorije
+                </h3>
+                <ul className="space-y-2">
+                  {allCategories.map((cat) => (
+                    <li key={cat.id}>
+                      <Link
+                        href={`/kategorija/${cat.slug}`}
+                        className={`block py-2 px-3 transition-colors ${
+                          cat.slug === categorySlug && !subcategorySlug
+                            ? "bg-lime/10 text-lime border-l-2 border-lime"
+                            : "text-zinc-400 hover:text-lime hover:bg-zinc-800"
+                        }`}
+                      >
+                        {cat.name}
+                      </Link>
+                      {cat.children.length > 0 && cat.slug === categorySlug && (
+                        <ul className="ml-4 mt-2 space-y-1 border-l border-zinc-800">
+                          {cat.children.map((sub) => (
+                            <li key={sub.id}>
+                              <Link
+                                href={`/kategorija/${cat.slug}/${sub.slug}`}
+                                className={`block py-1.5 px-3 text-sm transition-colors ${
+                                  sub.slug === subcategorySlug
+                                    ? "text-lime"
+                                    : "text-zinc-500 hover:text-lime"
+                                }`}
+                              >
+                                {sub.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Brands */}
+              {allBrands.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <span className="text-lime">//</span> Brendovi
+                  </h3>
+                  <ul className="space-y-2">
+                    {allBrands.map((brand) => (
+                      <li key={brand.id}>
+                        <Link
+                          href={`/brend/${brand.slug}`}
+                          className="block py-2 px-3 text-zinc-400 hover:text-lime hover:bg-zinc-800 transition-colors"
+                        >
+                          {brand.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </aside>
 
           {/* Products grid */}
           <div className="flex-1">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-zinc-800">
               <p className="text-zinc-400">
-                Prikazuje se <span className="text-lime font-bold">{filteredProducts.length}</span> proizvoda
+                Prikazuje se <span className="text-lime font-bold">{products.length}</span> proizvoda
               </p>
               <select className="bg-zinc-900 border border-zinc-800 text-white px-4 py-2 text-sm focus:border-lime focus:outline-none">
                 <option>Sortiraj po: Popularnosti</option>
@@ -234,30 +276,23 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-
-            {/* Pagination */}
-            <div className="mt-12 flex justify-center gap-2">
-              <button className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-lime hover:border-lime/50 transition-colors">
-                Prethodna
-              </button>
-              <button className="px-4 py-2 bg-lime text-black font-bold">
-                1
-              </button>
-              <button className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-lime hover:border-lime/50 transition-colors">
-                2
-              </button>
-              <button className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-lime hover:border-lime/50 transition-colors">
-                3
-              </button>
-              <button className="px-4 py-2 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-lime hover:border-lime/50 transition-colors">
-                Sledeća
-              </button>
-            </div>
+            {products.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <p className="text-zinc-500 text-lg">Nema proizvoda u ovoj kategoriji.</p>
+                <Link
+                  href="/"
+                  className="inline-block mt-4 text-lime hover:underline"
+                >
+                  Nazad na početnu
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

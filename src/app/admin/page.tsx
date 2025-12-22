@@ -1,110 +1,134 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import {
   Package,
   ShoppingCart,
   Users,
   TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
   Zap,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
-const stats = [
-  {
-    title: "Ukupna prodaja",
-    value: formatPrice(1245680),
-    change: "+12.5%",
-    trend: "up",
-    icon: TrendingUp,
-  },
-  {
-    title: "Porudžbine",
-    value: "156",
-    change: "+8.2%",
-    trend: "up",
-    icon: ShoppingCart,
-  },
-  {
-    title: "Proizvodi",
-    value: "234",
-    change: "+3",
-    trend: "up",
-    icon: Package,
-  },
-  {
-    title: "Korisnici",
-    value: "1,847",
-    change: "+24",
-    trend: "up",
-    icon: Users,
-  },
-];
+interface DashboardData {
+  stats: {
+    totalSales: number;
+    ordersCount: number;
+    productsCount: number;
+    usersCount: number;
+  };
+  recentOrders: {
+    id: string;
+    customer: string;
+    date: string;
+    total: number;
+    status: string;
+  }[];
+  topProducts: {
+    name: string;
+    sales: number;
+    revenue: number;
+  }[];
+}
 
-const recentOrders = [
-  {
-    id: "HOS-ABC123",
-    customer: "Marko Petrović",
-    date: "Danas, 14:32",
-    total: 6800,
-    status: "pending",
-  },
-  {
-    id: "HOS-DEF456",
-    customer: "Ana Jovanović",
-    date: "Danas, 12:15",
-    total: 4200,
-    status: "confirmed",
-  },
-  {
-    id: "HOS-GHI789",
-    customer: "Ivan Nikolić",
-    date: "Juče, 18:45",
-    total: 12500,
-    status: "shipped",
-  },
-  {
-    id: "HOS-JKL012",
-    customer: "Jelena Stojanović",
-    date: "Juče, 09:20",
-    total: 3400,
-    status: "delivered",
-  },
-  {
-    id: "HOS-MNO345",
-    customer: "Stefan Đorđević",
-    date: "20.12.2024",
-    total: 8900,
-    status: "delivered",
-  },
-];
-
-const topProducts = [
-  { name: "100% Pure Whey 2270g", sales: 89, revenue: 542900 },
-  { name: "BCAA EAA Strong 400g", sales: 67, revenue: 154100 },
-  { name: "Kreatin Monohidrat 500g", sales: 54, revenue: 99900 },
-  { name: "Omega 3 Fish Oil 120 caps", sales: 48, revenue: 71520 },
-  { name: "Pre-Workout Extreme 300g", sales: 41, revenue: 102090 },
-];
-
-const statusStyles = {
-  pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  confirmed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  processing: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  shipped: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-  delivered: "bg-lime/20 text-lime border-lime/30",
-  cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
+const statusStyles: Record<string, string> = {
+  PRIMLJENO: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  POSLATO: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  ISPORUCENO: "bg-lime/20 text-lime border-lime/30",
+  OTKAZANO: "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
-const statusLabels = {
-  pending: "Na čekanju",
-  confirmed: "Potvrđeno",
-  processing: "U obradi",
-  shipped: "Poslato",
-  delivered: "Dostavljeno",
-  cancelled: "Otkazano",
+const statusLabels: Record<string, string> = {
+  PRIMLJENO: "Primljeno",
+  POSLATO: "Poslato",
+  ISPORUCENO: "Isporučeno",
+  OTKAZANO: "Otkazano",
 };
 
 export default function AdminDashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const response = await fetch("/api/admin/dashboard");
+      if (response.ok) {
+        const dashboardData = await response.json();
+        setData(dashboardData);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const orderDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    const time = date.toLocaleTimeString("sr-RS", { hour: "2-digit", minute: "2-digit" });
+
+    if (orderDate.getTime() === today.getTime()) {
+      return `Danas, ${time}`;
+    } else if (orderDate.getTime() === yesterday.getTime()) {
+      return `Juče, ${time}`;
+    } else {
+      return date.toLocaleDateString("sr-RS", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 bg-zinc-800 w-48 animate-pulse" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-zinc-900 border border-zinc-800 h-32 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="bg-zinc-900 border border-zinc-800 h-96 animate-pulse" />
+          <div className="bg-zinc-900 border border-zinc-800 h-96 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  const stats = [
+    {
+      title: "Ukupna prodaja",
+      value: formatPrice(data?.stats.totalSales || 0),
+      icon: TrendingUp,
+    },
+    {
+      title: "Porudžbine",
+      value: (data?.stats.ordersCount || 0).toString(),
+      icon: ShoppingCart,
+    },
+    {
+      title: "Proizvodi",
+      value: (data?.stats.productsCount || 0).toString(),
+      icon: Package,
+    },
+    {
+      title: "Korisnici",
+      value: (data?.stats.usersCount || 0).toString(),
+      icon: Users,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -135,21 +159,6 @@ export default function AdminDashboard() {
             <div className="font-display text-3xl text-white mb-2">
               {stat.value}
             </div>
-            <div className="flex items-center text-sm">
-              {stat.trend === "up" ? (
-                <ArrowUpRight className="h-4 w-4 text-lime" />
-              ) : (
-                <ArrowDownRight className="h-4 w-4 text-red-400" />
-              )}
-              <span
-                className={
-                  stat.trend === "up" ? "text-lime" : "text-red-400"
-                }
-              >
-                {stat.change}
-              </span>
-              <span className="text-zinc-600 ml-2">od prošlog meseca</span>
-            </div>
           </div>
         ))}
       </div>
@@ -164,31 +173,37 @@ export default function AdminDashboard() {
             </h2>
           </div>
           <div className="p-6">
-            <div className="space-y-4">
-              {recentOrders.map((order) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between py-3 border-b border-zinc-800 last:border-0"
-                >
-                  <div>
-                    <p className="font-bold text-white">{order.id}</p>
-                    <p className="text-sm text-zinc-500">{order.customer}</p>
+            {data?.recentOrders && data.recentOrders.length > 0 ? (
+              <div className="space-y-4">
+                {data.recentOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between py-3 border-b border-zinc-800 last:border-0"
+                  >
+                    <div>
+                      <p className="font-bold text-white">{order.id}</p>
+                      <p className="text-sm text-zinc-500">{order.customer}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-lime">
+                        {formatPrice(order.total)}
+                      </p>
+                      <span
+                        className={`inline-block px-2 py-0.5 text-xs font-bold uppercase tracking-wider border ${
+                          statusStyles[order.status] || "bg-zinc-800 text-zinc-400 border-zinc-700"
+                        }`}
+                      >
+                        {statusLabels[order.status] || order.status}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lime">
-                      {formatPrice(order.total)}
-                    </p>
-                    <span
-                      className={`inline-block px-2 py-0.5 text-xs font-bold uppercase tracking-wider border ${
-                        statusStyles[order.status as keyof typeof statusStyles]
-                      }`}
-                    >
-                      {statusLabels[order.status as keyof typeof statusLabels]}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-zinc-500">
+                Nema porudžbina
+              </div>
+            )}
           </div>
         </div>
 
@@ -201,31 +216,37 @@ export default function AdminDashboard() {
             </h2>
           </div>
           <div className="p-6">
-            <div className="space-y-4">
-              {topProducts.map((product, index) => (
-                <div
-                  key={product.name}
-                  className="flex items-center gap-4 py-3 border-b border-zinc-800 last:border-0"
-                >
-                  <span className="w-8 h-8 bg-lime/10 border border-lime/30 flex items-center justify-center text-sm font-bold text-lime">
-                    {index + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white truncate">
-                      {product.name}
-                    </p>
-                    <p className="text-sm text-zinc-500">
-                      {product.sales} prodaja
-                    </p>
+            {data?.topProducts && data.topProducts.length > 0 ? (
+              <div className="space-y-4">
+                {data.topProducts.map((product, index) => (
+                  <div
+                    key={product.name}
+                    className="flex items-center gap-4 py-3 border-b border-zinc-800 last:border-0"
+                  >
+                    <span className="w-8 h-8 bg-lime/10 border border-lime/30 flex items-center justify-center text-sm font-bold text-lime">
+                      {index + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-white truncate">
+                        {product.name}
+                      </p>
+                      <p className="text-sm text-zinc-500">
+                        {product.sales} prodaja
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-lime">
+                        {formatPrice(product.revenue)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lime">
-                      {formatPrice(product.revenue)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-zinc-500">
+                Nema podataka o prodaji
+              </div>
+            )}
           </div>
         </div>
       </div>

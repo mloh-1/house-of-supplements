@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Bebas_Neue, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { SessionProvider } from "@/components/providers/session-provider";
+import { SettingsProvider } from "@/context/settings-context";
+import { WishlistSync } from "@/components/providers/wishlist-sync";
 
 const bebasNeue = Bebas_Neue({
   weight: "400",
@@ -58,8 +61,14 @@ export default function RootLayout({
         className={`${bebasNeue.variable} ${dmSans.variable} font-sans`}
         suppressHydrationWarning
       >
-        {children}
-        <Toaster />
+        <SessionProvider>
+          <WishlistSync>
+            <SettingsProvider>
+              {children}
+              <Toaster />
+            </SettingsProvider>
+          </WishlistSync>
+        </SessionProvider>
       </body>
     </html>
   );

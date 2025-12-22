@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -11,7 +12,7 @@ import {
   Trash2,
   Eye,
   Package,
-  Zap,
+  Minus,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -38,86 +39,131 @@ import {
 } from "@/components/ui/select";
 import { formatPrice } from "@/lib/utils";
 
-// Demo data
-const products = [
-  {
-    id: "1",
-    name: "100% Pure Whey 2270g",
-    slug: "100-pure-whey-2270g",
-    sku: "BT-PW-2270",
-    price: 7250,
-    salePrice: 6100,
-    stock: 15,
-    category: "Whey Protein",
-    brand: "BioTech USA",
-    active: true,
-    image:
-      "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=100&q=80",
-  },
-  {
-    id: "2",
-    name: "BCAA EAA Strong 400g",
-    slug: "bcaa-eaa-strong-400g",
-    sku: "UN-BCAA-400",
-    price: 2650,
-    salePrice: 2300,
-    stock: 8,
-    category: "BCAA",
-    brand: "Ultimate Nutrition",
-    active: true,
-    image:
-      "https://images.unsplash.com/photo-1579722820308-d74e571900a9?w=100&q=80",
-  },
-  {
-    id: "3",
-    name: "Kreatin Monohidrat 500g",
-    slug: "kreatin-monohidrat-500g",
-    sku: "ON-CR-500",
-    price: 1850,
-    salePrice: null,
-    stock: 25,
-    category: "Kreatin",
-    brand: "Optimum Nutrition",
-    active: true,
-    image:
-      "https://images.unsplash.com/photo-1594381898411-846e7d193883?w=100&q=80",
-  },
-  {
-    id: "4",
-    name: "Omega 3 Fish Oil 120 caps",
-    slug: "omega-3-fish-oil-120-caps",
-    sku: "MP-OM3-120",
-    price: 1490,
-    salePrice: null,
-    stock: 0,
-    category: "Vitamini",
-    brand: "MyProtein",
-    active: true,
-    image:
-      "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=100&q=80",
-  },
-  {
-    id: "5",
-    name: "Pre-Workout Extreme 300g",
-    slug: "pre-workout-extreme-300g",
-    sku: "BT-PWE-300",
-    price: 2990,
-    salePrice: 2490,
-    stock: 3,
-    category: "Pre-Workout",
-    brand: "BioTech USA",
-    active: false,
-    image:
-      "https://images.unsplash.com/photo-1546483875-ad9014c88eba?w=100&q=80",
-  },
-];
+interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  sku: string | null;
+  price: number;
+  salePrice: number | null;
+  stock: number;
+  active: boolean;
+  images: string;
+  category: {
+    name: string;
+  } | null;
+  brand: {
+    name: string;
+  } | null;
+}
 
-export default function ProductsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+function ProductsContent() {
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get("pretraga") || "";
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [updatingStock, setUpdatingStock] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Update search when URL changes
+  useEffect(() => {
+    setSearchQuery(initialSearch);
+  }, [initialSearch]);
+
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch("/api/admin/products");
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data);
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStock = async (productId: string, adjustment: number) => {
+    setUpdatingStock(productId);
+    try {
+      const response = await fetch(`/api/admin/products/${productId}/stock`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adjustment }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProducts((prev) =>
+          prev.map((product) =>
+            product.id === productId
+              ? { ...product, stock: data.product.stock }
+              : product
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error updating stock:", error);
+    } finally {
+      setUpdatingStock(null);
+    }
+  };
+
+  const deleteProduct = async (productId: string) => {
+    if (!confirm("Da li ste sigurni da želite da obrišete ovaj proizvod?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/products/${productId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+    }
+  };
+
+  const getProductImage = (images: string) => {
+    try {
+      const parsed = JSON.parse(images);
+      return parsed[0] || "https://via.placeholder.com/100";
+    } catch {
+      return "https://via.placeholder.com/100";
+    }
+  };
+
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch = product.name
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+
+    let matchesStatus = true;
+    if (statusFilter === "active") matchesStatus = product.active;
+    if (statusFilter === "inactive") matchesStatus = !product.active;
+    if (statusFilter === "out-of-stock") matchesStatus = product.stock === 0;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 bg-zinc-800 w-48 animate-pulse" />
+        <div className="bg-zinc-900 border border-zinc-800 h-96 animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -151,27 +197,23 @@ export default function ProductsPage() {
             />
           </div>
           <div className="flex gap-2">
-            <Select defaultValue="all">
-              <SelectTrigger className="w-[180px] bg-black border-zinc-700 text-zinc-300">
-                <SelectValue placeholder="Kategorija" />
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700">
-                <SelectItem value="all" className="text-zinc-300 focus:bg-lime focus:text-black">Sve kategorije</SelectItem>
-                <SelectItem value="proteini" className="text-zinc-300 focus:bg-lime focus:text-black">Proteini</SelectItem>
-                <SelectItem value="aminokiseline" className="text-zinc-300 focus:bg-lime focus:text-black">Aminokiseline</SelectItem>
-                <SelectItem value="kreatin" className="text-zinc-300 focus:bg-lime focus:text-black">Kreatin</SelectItem>
-                <SelectItem value="vitamini" className="text-zinc-300 focus:bg-lime focus:text-black">Vitamini</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select defaultValue="all">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[150px] bg-black border-zinc-700 text-zinc-300">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent className="bg-zinc-900 border-zinc-700">
-                <SelectItem value="all" className="text-zinc-300 focus:bg-lime focus:text-black">Svi</SelectItem>
-                <SelectItem value="active" className="text-zinc-300 focus:bg-lime focus:text-black">Aktivni</SelectItem>
-                <SelectItem value="inactive" className="text-zinc-300 focus:bg-lime focus:text-black">Neaktivni</SelectItem>
-                <SelectItem value="out-of-stock" className="text-zinc-300 focus:bg-lime focus:text-black">Nema na stanju</SelectItem>
+                <SelectItem value="all" className="text-zinc-300 focus:bg-lime focus:text-black">
+                  Svi
+                </SelectItem>
+                <SelectItem value="active" className="text-zinc-300 focus:bg-lime focus:text-black">
+                  Aktivni
+                </SelectItem>
+                <SelectItem value="inactive" className="text-zinc-300 focus:bg-lime focus:text-black">
+                  Neaktivni
+                </SelectItem>
+                <SelectItem value="out-of-stock" className="text-zinc-300 focus:bg-lime focus:text-black">
+                  Nema na stanju
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -184,130 +226,175 @@ export default function ProductsPage() {
           <TableHeader>
             <TableRow className="border-zinc-800 hover:bg-transparent">
               <TableHead className="w-[50px] text-zinc-500"></TableHead>
-              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold">Proizvod</TableHead>
-              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold">SKU</TableHead>
-              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold">Kategorija</TableHead>
-              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold text-right">Cena</TableHead>
-              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold text-center">Stanje</TableHead>
-              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold text-center">Status</TableHead>
+              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold">
+                Proizvod
+              </TableHead>
+              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold">
+                SKU
+              </TableHead>
+              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold">
+                Kategorija
+              </TableHead>
+              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold text-right">
+                Cena
+              </TableHead>
+              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold text-center">
+                Stanje
+              </TableHead>
+              <TableHead className="text-zinc-500 uppercase tracking-wider text-xs font-bold text-center">
+                Status
+              </TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.map((product) => (
-              <TableRow key={product.id} className="border-zinc-800 hover:bg-zinc-800/50">
-                <TableCell>
-                  <div className="relative w-12 h-12 bg-black border border-zinc-800 overflow-hidden">
-                    <Image
-                      src={product.image}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <p className="font-bold text-white">
-                      {product.name}
-                    </p>
-                    <p className="text-sm text-zinc-500">{product.brand}</p>
-                  </div>
-                </TableCell>
-                <TableCell className="text-zinc-400 font-mono text-sm">
-                  {product.sku}
-                </TableCell>
-                <TableCell className="text-zinc-400">
-                  {product.category}
-                </TableCell>
-                <TableCell className="text-right">
-                  {product.salePrice ? (
-                    <div>
-                      <p className="font-bold text-lime">
-                        {formatPrice(product.salePrice)}
-                      </p>
-                      <p className="text-sm text-zinc-600 line-through">
-                        {formatPrice(product.price)}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="font-bold text-white">
-                      {formatPrice(product.price)}
-                    </p>
-                  )}
-                </TableCell>
-                <TableCell className="text-center">
-                  {product.stock === 0 ? (
-                    <span className="inline-block px-2 py-1 text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/30">
-                      Nema
-                    </span>
-                  ) : product.stock <= 5 ? (
-                    <span className="inline-block px-2 py-1 text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                      {product.stock}
-                    </span>
-                  ) : (
-                    <span className="inline-block px-2 py-1 text-xs font-bold bg-lime/20 text-lime border border-lime/30">
-                      {product.stock}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="text-center">
-                  {product.active ? (
-                    <span className="inline-block px-2 py-1 text-xs font-bold uppercase bg-lime/20 text-lime border border-lime/30">
-                      Aktivan
-                    </span>
-                  ) : (
-                    <span className="inline-block px-2 py-1 text-xs font-bold uppercase bg-zinc-800 text-zinc-500 border border-zinc-700">
-                      Neaktivan
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="p-2 text-zinc-500 hover:text-lime transition-colors">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800">
-                      <DropdownMenuItem className="text-zinc-300 focus:bg-zinc-800 focus:text-white cursor-pointer">
-                        <Eye className="h-4 w-4 mr-2" />
-                        Pregled
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="text-zinc-300 focus:bg-zinc-800 focus:text-white cursor-pointer">
-                        <Link href={`/admin/proizvodi/${product.id}`}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Izmeni
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-zinc-800" />
-                      <DropdownMenuItem className="text-red-400 focus:bg-zinc-800 focus:text-red-400 cursor-pointer">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Obriši
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {filteredProducts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-12 text-zinc-500">
+                  Nema proizvoda za prikaz
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filteredProducts.map((product) => (
+                <TableRow key={product.id} className="border-zinc-800 hover:bg-zinc-800/50">
+                  <TableCell>
+                    <div className="relative w-12 h-12 bg-black border border-zinc-800 overflow-hidden">
+                      <Image
+                        src={getProductImage(product.images)}
+                        alt={product.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-bold text-white">{product.name}</p>
+                      <p className="text-sm text-zinc-500">{product.brand?.name || "-"}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-zinc-400 font-mono text-sm">
+                    {product.sku || "-"}
+                  </TableCell>
+                  <TableCell className="text-zinc-400">
+                    {product.category?.name || "-"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {product.salePrice ? (
+                      <div>
+                        <p className="font-bold text-lime">
+                          {formatPrice(product.salePrice)}
+                        </p>
+                        <p className="text-sm text-zinc-600 line-through">
+                          {formatPrice(product.price)}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="font-bold text-white">{formatPrice(product.price)}</p>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => updateStock(product.id, -1)}
+                        disabled={updatingStock === product.id || product.stock === 0}
+                        className="p-1 text-zinc-500 hover:text-lime disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      {product.stock === 0 ? (
+                        <span className="inline-block min-w-[60px] px-2 py-1 text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/30 text-center">
+                          Nema
+                        </span>
+                      ) : product.stock <= 5 ? (
+                        <span className="inline-block min-w-[60px] px-2 py-1 text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-center">
+                          {product.stock}
+                        </span>
+                      ) : (
+                        <span className="inline-block min-w-[60px] px-2 py-1 text-xs font-bold bg-lime/20 text-lime border border-lime/30 text-center">
+                          {product.stock}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => updateStock(product.id, 1)}
+                        disabled={updatingStock === product.id}
+                        className="p-1 text-zinc-500 hover:text-lime disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {product.active ? (
+                      <span className="inline-block px-2 py-1 text-xs font-bold uppercase bg-lime/20 text-lime border border-lime/30">
+                        Aktivan
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2 py-1 text-xs font-bold uppercase bg-zinc-800 text-zinc-500 border border-zinc-700">
+                        Neaktivan
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-2 text-zinc-500 hover:text-lime transition-colors">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800">
+                        <DropdownMenuItem asChild className="text-zinc-300 focus:bg-zinc-800 focus:text-white cursor-pointer">
+                          <Link href={`/proizvod/${product.slug}`} target="_blank">
+                            <Eye className="h-4 w-4 mr-2" />
+                            Pregled
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild className="text-zinc-300 focus:bg-zinc-800 focus:text-white cursor-pointer">
+                          <Link href={`/admin/proizvodi/${product.id}`}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Izmeni
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-zinc-800" />
+                        <DropdownMenuItem
+                          className="text-red-400 focus:bg-zinc-800 focus:text-red-400 cursor-pointer"
+                          onClick={() => deleteProduct(product.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Obriši
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
 
         {/* Pagination */}
         <div className="flex items-center justify-between p-4 border-t border-zinc-800">
           <p className="text-sm text-zinc-500">
-            Prikazano <span className="text-lime font-bold">{filteredProducts.length}</span> od <span className="text-white">{products.length}</span> proizvoda
+            Prikazano <span className="text-lime font-bold">{filteredProducts.length}</span> od{" "}
+            <span className="text-white">{products.length}</span> proizvoda
           </p>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 border border-zinc-700 text-zinc-500 hover:border-lime hover:text-lime transition-colors text-sm font-bold uppercase" disabled>
-              Prethodna
-            </button>
-            <button className="px-4 py-2 border border-zinc-700 text-zinc-400 hover:border-lime hover:text-lime transition-colors text-sm font-bold uppercase">
-              Sledeća
-            </button>
-          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <div className="h-8 bg-zinc-800 w-48 animate-pulse" />
+          <div className="bg-zinc-900 border border-zinc-800 h-96 animate-pulse" />
+        </div>
+      }
+    >
+      <ProductsContent />
+    </Suspense>
   );
 }
