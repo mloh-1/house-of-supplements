@@ -35,7 +35,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { name, description } = body;
+    const { name } = body;
 
     const existingBrand = await db.brand.findUnique({
       where: { id },
@@ -48,7 +48,7 @@ export async function PATCH(
       );
     }
 
-    const updateData: { name?: string; slug?: string; description?: string | null } = {};
+    const updateData: { name?: string; slug?: string } = {};
 
     if (name && name !== existingBrand.name) {
       const slug = generateSlug(name);
@@ -67,10 +67,6 @@ export async function PATCH(
 
       updateData.name = name;
       updateData.slug = slug;
-    }
-
-    if (description !== undefined) {
-      updateData.description = description || null;
     }
 
     const brand = await db.brand.update({
