@@ -23,6 +23,7 @@ interface Category {
   id: string;
   name: string;
   slug: string;
+  children?: Category[];
 }
 
 interface Brand {
@@ -439,15 +440,29 @@ export default function NewProductPage() {
                     <SelectTrigger className="bg-black border-zinc-700 text-zinc-300">
                       <SelectValue placeholder="Izaberite kategoriju" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-zinc-700">
+                    <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
                       {categories.map((category) => (
-                        <SelectItem
-                          key={category.id}
-                          value={category.id}
-                          className="text-zinc-300 focus:bg-lime focus:text-black"
-                        >
-                          {category.name}
-                        </SelectItem>
+                        <div key={category.id}>
+                          {/* Parent category */}
+                          <SelectItem
+                            value={category.id}
+                            className="text-zinc-300 focus:bg-lime focus:text-black font-bold"
+                          >
+                            {category.name}
+                          </SelectItem>
+                          {/* Subcategories */}
+                          {category.children && category.children.length > 0 && (
+                            category.children.map((sub) => (
+                              <SelectItem
+                                key={sub.id}
+                                value={sub.id}
+                                className="text-zinc-400 focus:bg-lime focus:text-black pl-6"
+                              >
+                                ↳ {sub.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </div>
                       ))}
                     </SelectContent>
                   </Select>
