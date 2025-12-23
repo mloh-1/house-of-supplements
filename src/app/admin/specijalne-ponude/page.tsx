@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Plus, Edit, Trash2, Clock, Calendar } from "lucide-react";
+import { Plus, Edit, Trash2, Calendar, Loader2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -24,92 +34,196 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
 
-// Demo data
-const specialOffers = [
-  {
-    id: "1",
-    product: {
-      id: "1",
-      name: "Bulgarian Tribulus 90 caps",
-      price: 3400,
-      image:
-        "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&q=80",
-    },
-    discountPercent: 28,
-    startDate: "2024-12-15",
-    endDate: "2024-12-25",
-    active: true,
-    featured: true,
-  },
-  {
-    id: "2",
-    product: {
-      id: "2",
-      name: "100% Pure Whey 2270g",
-      price: 7250,
-      image:
-        "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=200&q=80",
-    },
-    discountPercent: 15,
-    startDate: "2024-12-10",
-    endDate: "2024-12-31",
-    active: true,
-    featured: false,
-  },
-  {
-    id: "3",
-    product: {
-      id: "3",
-      name: "BCAA EAA Strong 400g",
-      price: 2650,
-      image:
-        "https://images.unsplash.com/photo-1579722820308-d74e571900a9?w=200&q=80",
-    },
-    discountPercent: 13,
-    startDate: "2024-12-01",
-    endDate: "2024-12-20",
-    active: false,
-    featured: false,
-  },
-];
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  images: string[];
+}
 
-const availableProducts = [
-  { id: "1", name: "Bulgarian Tribulus 90 caps", price: 3400 },
-  { id: "2", name: "100% Pure Whey 2270g", price: 7250 },
-  { id: "3", name: "BCAA EAA Strong 400g", price: 2650 },
-  { id: "4", name: "Kreatin Monohidrat 500g", price: 1850 },
-  { id: "5", name: "Omega 3 Fish Oil 120 caps", price: 1490 },
-];
+interface SpecialOffer {
+  id: string;
+  productId: string;
+  product: Product;
+  discountPercent: number;
+  startDate: string;
+  endDate: string;
+  active: boolean;
+  featured: boolean;
+}
 
 export default function SpecialOffersPage() {
-  const [offers, setOffers] = useState(specialOffers);
+  const [offers, setOffers] = useState<SpecialOffer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingOffer, setEditingOffer] = useState<(typeof specialOffers)[0] | null>(null);
+  const [editingOffer, setEditingOffer] = useState<SpecialOffer | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
-  const toggleActive = (id: string) => {
-    setOffers(
-      offers.map((offer) =>
-        offer.id === id ? { ...offer, active: !offer.active } : offer
-      )
-    );
+  // Form state
+  const [formData, setFormData] = useState({
+    productId: "",
+    discountPercent: "",
+    startDate: "",
+    endDate: "",
+    active: true,
+    featured: false,
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [offersRes, productsRes] = await Promise.all([
+        fetch("/api/admin/special-offers"),
+        fetch("/api/products"),
+      ]);
+
+      if (offersRes.ok) {
+        const offersData = await offersRes.json();
+        setOffers(offersData);
+      }
+
+      if (productsRes.ok) {
+        const productsData = await productsRes.json();
+        setProducts(productsData.products || []);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleFeatured = (id: string) => {
-    setOffers(
-      offers.map((offer) =>
-        offer.id === id ? { ...offer, featured: !offer.featured } : offer
-      )
-    );
+  const toggleActive = async (offer: SpecialOffer) => {
+    try {
+      const response = await fetch(`/api/admin/special-offers/${offer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !offer.active }),
+      });
+
+      if (response.ok) {
+        setOffers(offers.map((o) =>
+          o.id === offer.id ? { ...o, active: !o.active } : o
+        ));
+      }
+    } catch (error) {
+      console.error("Error toggling active:", error);
+    }
   };
 
-  const openEditDialog = (offer: (typeof specialOffers)[0]) => {
+  const toggleFeatured = async (offer: SpecialOffer) => {
+    try {
+      const response = await fetch(`/api/admin/special-offers/${offer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featured: !offer.featured }),
+      });
+
+      if (response.ok) {
+        setOffers(offers.map((o) =>
+          o.id === offer.id ? { ...o, featured: !o.featured } : o
+        ));
+      }
+    } catch (error) {
+      console.error("Error toggling featured:", error);
+    }
+  };
+
+  const openEditDialog = (offer: SpecialOffer) => {
     setEditingOffer(offer);
+    setFormData({
+      productId: offer.productId,
+      discountPercent: offer.discountPercent.toString(),
+      startDate: new Date(offer.startDate).toISOString().split("T")[0],
+      endDate: new Date(offer.endDate).toISOString().split("T")[0],
+      active: offer.active,
+      featured: offer.featured,
+    });
+    setError("");
     setIsDialogOpen(true);
   };
 
   const openNewDialog = () => {
     setEditingOffer(null);
+    setFormData({
+      productId: "",
+      discountPercent: "",
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: "",
+      active: true,
+      featured: false,
+    });
+    setError("");
     setIsDialogOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+
+    if (!formData.productId || !formData.discountPercent || !formData.endDate) {
+      setError("Proizvod, popust i datum završetka su obavezni");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      const url = editingOffer
+        ? `/api/admin/special-offers/${editingOffer.id}`
+        : "/api/admin/special-offers";
+      const method = editingOffer ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Došlo je do greške");
+        setSaving(false);
+        return;
+      }
+
+      if (editingOffer) {
+        setOffers(offers.map((o) => (o.id === editingOffer.id ? data : o)));
+      } else {
+        setOffers([data, ...offers]);
+      }
+
+      setIsDialogOpen(false);
+    } catch {
+      setError("Došlo je do greške. Pokušajte ponovo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    try {
+      const response = await fetch(`/api/admin/special-offers/${deleteId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setOffers(offers.filter((o) => o.id !== deleteId));
+      }
+    } catch (error) {
+      console.error("Error deleting offer:", error);
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   const calculateSalePrice = (price: number, discount: number) => {
@@ -120,46 +234,68 @@ export default function SpecialOffersPage() {
     return new Date(endDate) < new Date();
   };
 
+  // Get products that don't already have an offer (for new offers)
+  const availableProducts = products.filter(
+    (p) => !offers.some((o) => o.productId === p.id) || editingOffer?.productId === p.id
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 text-lime animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-navy-900">Specijalne Ponude</h1>
-          <p className="text-navy-600">
-            Upravljajte vremenski ograničenim ponudama sa tajmerom
+          <h1 className="font-display text-2xl text-white">SPECIJALNE PONUDE</h1>
+          <p className="text-zinc-500">
+            Upravljajte vremenski ograničenim ponudama
           </p>
         </div>
-        <Button variant="accent" onClick={openNewDialog}>
+        <Button
+          onClick={openNewDialog}
+          className="bg-lime hover:bg-lime-400 text-black font-bold"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Dodaj ponudu
         </Button>
       </div>
 
       {/* Active featured offer */}
-      {offers.filter((o) => o.active && o.featured).length > 0 && (
-        <Card className="bg-gradient-to-r from-navy-900 to-navy-800 text-white">
+      {offers.filter((o) => o.active && o.featured && !isExpired(o.endDate)).length > 0 && (
+        <Card className="bg-gradient-to-r from-lime/20 to-lime/5 border-lime/30">
           <CardHeader>
-            <CardTitle className="text-orange-400">
+            <CardTitle className="text-lime">
               Istaknuta ponuda na početnoj
             </CardTitle>
           </CardHeader>
           <CardContent>
             {offers
-              .filter((o) => o.active && o.featured)
+              .filter((o) => o.active && o.featured && !isExpired(o.endDate))
               .map((offer) => (
                 <div key={offer.id} className="flex items-center gap-4">
-                  <div className="w-20 h-20 relative rounded-lg overflow-hidden bg-white">
-                    <Image
-                      src={offer.product.image}
-                      alt={offer.product.name}
-                      fill
-                      className="object-contain p-2"
-                    />
+                  <div className="w-20 h-20 relative overflow-hidden bg-black border border-zinc-800">
+                    {offer.product.images[0] ? (
+                      <Image
+                        src={offer.product.images[0]}
+                        alt={offer.product.name}
+                        fill
+                        className="object-contain p-2"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <Package className="h-8 w-8 text-zinc-600" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-bold">{offer.product.name}</h3>
+                    <h3 className="font-bold text-white">{offer.product.name}</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xl font-bold text-orange-400">
+                      <span className="text-xl font-bold text-lime">
                         {formatPrice(
                           calculateSalePrice(
                             offer.product.price,
@@ -167,17 +303,17 @@ export default function SpecialOffersPage() {
                           )
                         )}
                       </span>
-                      <span className="text-navy-400 line-through">
+                      <span className="text-zinc-500 line-through">
                         {formatPrice(offer.product.price)}
                       </span>
-                      <Badge className="bg-orange-500">
+                      <Badge className="bg-red-500 text-white">
                         -{offer.discountPercent}%
                       </Badge>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-navy-300">Ističe:</p>
-                    <p className="font-medium">
+                    <p className="text-sm text-zinc-500">Ističe:</p>
+                    <p className="font-medium text-white">
                       {new Date(offer.endDate).toLocaleDateString("sr-RS")}
                     </p>
                   </div>
@@ -188,112 +324,157 @@ export default function SpecialOffersPage() {
       )}
 
       {/* All offers */}
-      <div className="grid gap-4">
-        {offers.map((offer) => (
-          <Card
-            key={offer.id}
-            className={isExpired(offer.endDate) ? "opacity-60" : ""}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 relative rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                  <Image
-                    src={offer.product.image}
-                    alt={offer.product.name}
-                    fill
-                    className="object-contain p-2"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium text-navy-900 truncate">
-                      {offer.product.name}
-                    </h3>
-                    {isExpired(offer.endDate) ? (
-                      <Badge variant="destructive">Isteklo</Badge>
-                    ) : offer.active ? (
-                      <Badge variant="success">Aktivno</Badge>
+      {offers.length === 0 ? (
+        <Card className="bg-zinc-900 border-zinc-800">
+          <CardContent className="py-16 text-center">
+            <Package className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
+            <p className="text-zinc-500 mb-4">Nema specijalnih ponuda</p>
+            <Button
+              onClick={openNewDialog}
+              className="bg-lime hover:bg-lime-400 text-black font-bold"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Dodaj prvu ponudu
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {offers.map((offer) => (
+            <Card
+              key={offer.id}
+              className={`bg-zinc-900 border-zinc-800 ${isExpired(offer.endDate) ? "opacity-60" : ""}`}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 relative overflow-hidden bg-black border border-zinc-800 flex-shrink-0">
+                    {offer.product.images[0] ? (
+                      <Image
+                        src={offer.product.images[0]}
+                        alt={offer.product.name}
+                        fill
+                        className="object-contain p-2"
+                      />
                     ) : (
-                      <Badge variant="secondary">Neaktivno</Badge>
-                    )}
-                    {offer.featured && (
-                      <Badge variant="accent">Istaknuto</Badge>
+                      <div className="flex items-center justify-center h-full">
+                        <Package className="h-6 w-6 text-zinc-600" />
+                      </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-orange-600 font-bold">
-                      -{offer.discountPercent}%
-                    </span>
-                    <span className="text-navy-600">
-                      {formatPrice(offer.product.price)} →{" "}
-                      <span className="font-medium text-navy-900">
-                        {formatPrice(
-                          calculateSalePrice(
-                            offer.product.price,
-                            offer.discountPercent
-                          )
-                        )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h3 className="font-medium text-white truncate">
+                        {offer.product.name}
+                      </h3>
+                      {isExpired(offer.endDate) ? (
+                        <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Isteklo</Badge>
+                      ) : offer.active ? (
+                        <Badge className="bg-lime/20 text-lime border-lime/30">Aktivno</Badge>
+                      ) : (
+                        <Badge className="bg-zinc-700 text-zinc-400">Neaktivno</Badge>
+                      )}
+                      {offer.featured && (
+                        <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Istaknuto</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-red-500 font-bold">
+                        -{offer.discountPercent}%
                       </span>
-                    </span>
+                      <span className="text-zinc-500">
+                        {formatPrice(offer.product.price)} →{" "}
+                        <span className="font-medium text-lime">
+                          {formatPrice(
+                            calculateSalePrice(
+                              offer.product.price,
+                              offer.discountPercent
+                            )
+                          )}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-zinc-500 mt-1">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(offer.startDate).toLocaleDateString("sr-RS")} -{" "}
+                        {new Date(offer.endDate).toLocaleDateString("sr-RS")}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-navy-500 mt-1">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {new Date(offer.startDate).toLocaleDateString("sr-RS")} -{" "}
-                      {new Date(offer.endDate).toLocaleDateString("sr-RS")}
-                    </span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right mr-2">
+                      <Label className="text-xs text-zinc-500">Istaknuto</Label>
+                      <Switch
+                        checked={offer.featured}
+                        onCheckedChange={() => toggleFeatured(offer)}
+                        className="data-[state=checked]:bg-lime"
+                      />
+                    </div>
+                    <div className="text-right mr-2">
+                      <Label className="text-xs text-zinc-500">Aktivno</Label>
+                      <Switch
+                        checked={offer.active}
+                        onCheckedChange={() => toggleActive(offer)}
+                        className="data-[state=checked]:bg-lime"
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditDialog(offer)}
+                      className="text-zinc-400 hover:text-lime"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-zinc-400 hover:text-red-500"
+                      onClick={() => setDeleteId(offer.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right mr-2">
-                    <Label className="text-xs text-navy-500">Istaknuto</Label>
-                    <Switch
-                      checked={offer.featured}
-                      onCheckedChange={() => toggleFeatured(offer.id)}
-                    />
-                  </div>
-                  <div className="text-right mr-2">
-                    <Label className="text-xs text-navy-500">Aktivno</Label>
-                    <Switch
-                      checked={offer.active}
-                      onCheckedChange={() => toggleActive(offer.id)}
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEditDialog(offer)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-red-500">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
           <DialogHeader>
             <DialogTitle>
               {editingOffer ? "Izmeni ponudu" : "Nova specijalna ponuda"}
             </DialogTitle>
           </DialogHeader>
-          <form className="space-y-4">
+
+          {error && (
+            <div className="bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-3 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label>Proizvod *</Label>
-              <Select defaultValue={editingOffer?.product.id}>
-                <SelectTrigger className="mt-1">
+              <Label className="text-zinc-400">Proizvod *</Label>
+              <Select
+                value={formData.productId}
+                onValueChange={(value) => setFormData({ ...formData, productId: value })}
+                disabled={!!editingOffer}
+              >
+                <SelectTrigger className="mt-1 bg-black border-zinc-700 text-zinc-300">
                   <SelectValue placeholder="Izaberite proizvod" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
                   {availableProducts.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
+                    <SelectItem
+                      key={product.id}
+                      value={product.id}
+                      className="text-zinc-300 focus:bg-lime focus:text-black"
+                    >
                       {product.name} - {formatPrice(product.price)}
                     </SelectItem>
                   ))}
@@ -302,35 +483,38 @@ export default function SpecialOffersPage() {
             </div>
 
             <div>
-              <Label htmlFor="discount">Popust (%) *</Label>
+              <Label htmlFor="discount" className="text-zinc-400">Popust (%) *</Label>
               <Input
                 id="discount"
                 type="number"
                 min="1"
                 max="99"
                 placeholder="npr. 20"
-                defaultValue={editingOffer?.discountPercent}
-                className="mt-1"
+                value={formData.discountPercent}
+                onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
+                className="mt-1 bg-black border-zinc-700 text-white"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="startDate">Datum početka *</Label>
+                <Label htmlFor="startDate" className="text-zinc-400">Datum početka *</Label>
                 <Input
                   id="startDate"
                   type="date"
-                  defaultValue={editingOffer?.startDate}
-                  className="mt-1"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  className="mt-1 bg-black border-zinc-700 text-white"
                 />
               </div>
               <div>
-                <Label htmlFor="endDate">Datum završetka *</Label>
+                <Label htmlFor="endDate" className="text-zinc-400">Datum završetka *</Label>
                 <Input
                   id="endDate"
                   type="date"
-                  defaultValue={editingOffer?.endDate}
-                  className="mt-1"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  className="mt-1 bg-black border-zinc-700 text-white"
                 />
               </div>
             </div>
@@ -339,16 +523,20 @@ export default function SpecialOffersPage() {
               <div className="flex items-center gap-2">
                 <Switch
                   id="active"
-                  defaultChecked={editingOffer?.active ?? true}
+                  checked={formData.active}
+                  onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
+                  className="data-[state=checked]:bg-lime"
                 />
-                <Label htmlFor="active">Aktivna ponuda</Label>
+                <Label htmlFor="active" className="text-zinc-300">Aktivna ponuda</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
                   id="featured"
-                  defaultChecked={editingOffer?.featured ?? false}
+                  checked={formData.featured}
+                  onCheckedChange={(checked) => setFormData({ ...formData, featured: checked })}
+                  className="data-[state=checked]:bg-lime"
                 />
-                <Label htmlFor="featured">Istaknuta na početnoj</Label>
+                <Label htmlFor="featured" className="text-zinc-300">Istaknuta na početnoj</Label>
               </div>
             </div>
 
@@ -357,16 +545,45 @@ export default function SpecialOffersPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsDialogOpen(false)}
+                className="border-zinc-700 text-zinc-300"
               >
                 Otkaži
               </Button>
-              <Button type="submit" variant="accent">
-                {editingOffer ? "Sačuvaj izmene" : "Dodaj ponudu"}
+              <Button
+                type="submit"
+                disabled={saving}
+                className="bg-lime hover:bg-lime-400 text-black font-bold"
+              >
+                {saving ? "Čuvanje..." : editingOffer ? "Sačuvaj izmene" : "Dodaj ponudu"}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Obriši ponudu?</AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400">
+              Da li ste sigurni da želite da obrišete ovu specijalnu ponudu?
+              Akcijska cena će biti uklonjena sa proizvoda.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+              Otkaži
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Obriši
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
