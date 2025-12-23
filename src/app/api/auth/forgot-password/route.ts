@@ -143,6 +143,25 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Forgot password error:", error);
+
+    // Return more specific error in development
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+    // Check for common issues
+    if (errorMessage.includes("no such table")) {
+      return NextResponse.json(
+        { error: "Baza podataka nije pravilno konfigurisana. Kontaktirajte administratora." },
+        { status: 500 }
+      );
+    }
+
+    if (errorMessage.includes("Resend") || errorMessage.includes("email")) {
+      return NextResponse.json(
+        { error: "Greška pri slanju emaila. Pokušajte ponovo." },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Došlo je do greške. Pokušajte ponovo." },
       { status: 500 }
