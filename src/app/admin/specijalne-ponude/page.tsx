@@ -108,9 +108,13 @@ export default function SpecialOffersPage() {
       });
 
       if (response.ok) {
+        const updatedOffer = await response.json();
         setOffers(offers.map((o) =>
-          o.id === offer.id ? { ...o, active: !o.active } : o
+          o.id === offer.id ? { ...o, active: updatedOffer.active } : o
         ));
+      } else {
+        const errorData = await response.json();
+        console.error("Failed to toggle active:", errorData.error);
       }
     } catch (error) {
       console.error("Error toggling active:", error);
@@ -126,9 +130,13 @@ export default function SpecialOffersPage() {
       });
 
       if (response.ok) {
+        const updatedOffer = await response.json();
         setOffers(offers.map((o) =>
-          o.id === offer.id ? { ...o, featured: !o.featured } : o
+          o.id === offer.id ? { ...o, featured: updatedOffer.featured } : o
         ));
+      } else {
+        const errorData = await response.json();
+        console.error("Failed to toggle featured:", errorData.error);
       }
     } catch (error) {
       console.error("Error toggling featured:", error);

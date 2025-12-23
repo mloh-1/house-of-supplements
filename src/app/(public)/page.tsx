@@ -328,7 +328,7 @@ export default async function HomePage() {
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-10 items-center">
-                  <div className="relative aspect-square max-w-md mx-auto">
+                  <div className="relative aspect-square w-full max-w-md mx-auto">
                     <div className="absolute inset-0 bg-gradient-to-br from-lime/20 to-transparent opacity-50" />
                     {specialOffer.product.images[0] ? (
                       <Image
@@ -336,6 +336,7 @@ export default async function HomePage() {
                         alt={specialOffer.product.name}
                         fill
                         className="object-contain p-8"
+                        sizes="(max-width: 768px) 100vw, 400px"
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full text-zinc-600">
