@@ -1,33 +1,29 @@
+import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
   // Protect admin routes
   if (pathname.startsWith("/admin")) {
-    const token = await getToken({
-      req: request,
-      secret: process.env.AUTH_SECRET,
-    });
+    const session = req.auth;
 
-    if (!token) {
+    if (!session?.user) {
       // Redirect to login if not authenticated
-      const url = new URL("/login", request.url);
+      const url = new URL("/login", req.url);
       url.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(url);
     }
 
     // Check if user has ADMIN role
-    if (token.role !== "ADMIN") {
+    if (session.user.role !== "ADMIN") {
       // Redirect to home if not admin
-      return NextResponse.redirect(new URL("/", request.url));
+      return NextResponse.redirect(new URL("/", req.url));
     }
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/admin/:path*"],
