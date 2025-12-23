@@ -155,6 +155,13 @@ async function getSpecialOffer() {
     orderBy: { createdAt: "desc" },
   });
 
+  console.log("[SpecialOffer] Featured query result:", offer ? {
+    id: offer.id,
+    active: offer.active,
+    featured: offer.featured,
+    productImages: offer.product.images,
+  } : "NOT FOUND");
+
   // Fallback to any active offer if no featured one
   if (!offer) {
     const fallbackOffer = await db.specialOffer.findFirst({
@@ -167,6 +174,7 @@ async function getSpecialOffer() {
       },
       orderBy: { createdAt: "desc" },
     });
+    console.log("[SpecialOffer] Fallback query result:", fallbackOffer ? "FOUND" : "NOT FOUND");
     return fallbackOffer;
   }
 
@@ -182,6 +190,9 @@ export default async function HomePage() {
     getSettings(),
   ]);
 
+  const parsedOfferImages = specialOfferData ? parseImages(specialOfferData.product.images) : [];
+  console.log("[SpecialOffer] Parsed images:", parsedOfferImages);
+
   const specialOffer = specialOfferData ? {
     product: {
       id: specialOfferData.product.id,
@@ -189,7 +200,7 @@ export default async function HomePage() {
       slug: specialOfferData.product.slug,
       price: specialOfferData.product.price,
       salePrice: specialOfferData.product.salePrice,
-      images: parseImages(specialOfferData.product.images),
+      images: parsedOfferImages,
       stock: specialOfferData.product.stock,
     },
     endDate: new Date(specialOfferData.endDate),
