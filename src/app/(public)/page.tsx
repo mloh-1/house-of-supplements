@@ -143,6 +143,7 @@ async function getSaleProducts() {
 
 async function getSpecialOffer() {
   // Get the featured special offer from the SpecialOffer table
+  // Only returns offers that are both active AND featured
   const offer = await db.specialOffer.findFirst({
     where: {
       active: true,
@@ -155,28 +156,12 @@ async function getSpecialOffer() {
     orderBy: { createdAt: "desc" },
   });
 
-  console.log("[SpecialOffer] Featured query result:", offer ? {
+  console.log("[SpecialOffer] Query result:", offer ? {
     id: offer.id,
     active: offer.active,
     featured: offer.featured,
     productImages: offer.product.images,
-  } : "NOT FOUND");
-
-  // Fallback to any active offer if no featured one
-  if (!offer) {
-    const fallbackOffer = await db.specialOffer.findFirst({
-      where: {
-        active: true,
-        endDate: { gte: new Date() },
-      },
-      include: {
-        product: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    console.log("[SpecialOffer] Fallback query result:", fallbackOffer ? "FOUND" : "NOT FOUND");
-    return fallbackOffer;
-  }
+  } : "NO FEATURED OFFER FOUND");
 
   return offer;
 }
