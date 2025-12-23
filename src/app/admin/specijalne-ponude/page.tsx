@@ -100,46 +100,62 @@ export default function SpecialOffersPage() {
   };
 
   const toggleActive = async (offer: SpecialOffer) => {
+    const newActive = !offer.active;
+    console.log("[Toggle Active] Sending:", { active: newActive });
+
     try {
       const response = await fetch(`/api/admin/special-offers/${offer.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: !offer.active }),
+        body: JSON.stringify({ active: newActive }),
       });
+
+      console.log("[Toggle Active] Response status:", response.status);
 
       if (response.ok) {
         const updatedOffer = await response.json();
-        setOffers(offers.map((o) =>
+        console.log("[Toggle Active] Updated offer:", updatedOffer);
+        setOffers((prev) => prev.map((o) =>
           o.id === offer.id ? { ...o, active: updatedOffer.active } : o
         ));
       } else {
         const errorData = await response.json();
         console.error("Failed to toggle active:", errorData.error);
+        alert("Greška: " + errorData.error);
       }
     } catch (error) {
       console.error("Error toggling active:", error);
+      alert("Greška pri promeni statusa");
     }
   };
 
   const toggleFeatured = async (offer: SpecialOffer) => {
+    const newFeatured = !offer.featured;
+    console.log("[Toggle Featured] Sending:", { featured: newFeatured });
+
     try {
       const response = await fetch(`/api/admin/special-offers/${offer.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ featured: !offer.featured }),
+        body: JSON.stringify({ featured: newFeatured }),
       });
+
+      console.log("[Toggle Featured] Response status:", response.status);
 
       if (response.ok) {
         const updatedOffer = await response.json();
-        setOffers(offers.map((o) =>
+        console.log("[Toggle Featured] Updated offer:", updatedOffer);
+        setOffers((prev) => prev.map((o) =>
           o.id === offer.id ? { ...o, featured: updatedOffer.featured } : o
         ));
       } else {
         const errorData = await response.json();
         console.error("Failed to toggle featured:", errorData.error);
+        alert("Greška: " + errorData.error);
       }
     } catch (error) {
       console.error("Error toggling featured:", error);
+      alert("Greška pri promeni statusa");
     }
   };
 

@@ -24,6 +24,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
+    console.log("[PATCH Special Offer] ID:", id, "Body:", body);
     const { discountPercent, startDate, endDate, active, featured } = body;
 
     const existingOffer = await db.specialOffer.findUnique({
@@ -63,6 +64,7 @@ export async function PATCH(
       updateData.featured = featured;
     }
 
+    console.log("[PATCH Special Offer] Update data:", updateData);
     const offer = await db.specialOffer.update({
       where: { id },
       data: updateData,
@@ -77,6 +79,7 @@ export async function PATCH(
         },
       },
     });
+    console.log("[PATCH Special Offer] Updated offer featured:", offer.featured);
 
     // Update product's sale price if discount changed
     if (discountPercent !== undefined) {
