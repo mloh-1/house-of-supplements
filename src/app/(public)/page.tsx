@@ -141,42 +141,59 @@ async function getSaleProducts() {
   }));
 }
 
-async function getSpecialOfferProduct() {
-  // Get a random product with a sale price for the special offer
-  const product = await db.product.findFirst({
+async function getSpecialOffer() {
+  // Get the featured special offer from the SpecialOffer table
+  const offer = await db.specialOffer.findFirst({
     where: {
       active: true,
-      salePrice: { not: null },
+      featured: true,
+      endDate: { gte: new Date() }, // Not expired
+    },
+    include: {
+      product: true,
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return product;
+  // Fallback to any active offer if no featured one
+  if (!offer) {
+    const fallbackOffer = await db.specialOffer.findFirst({
+      where: {
+        active: true,
+        endDate: { gte: new Date() },
+      },
+      include: {
+        product: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return fallbackOffer;
+  }
+
+  return offer;
 }
 
 export default async function HomePage() {
-  const [featuredProducts, saleProducts, specialOfferProduct, heroSlides, settings] = await Promise.all([
+  const [featuredProducts, saleProducts, specialOfferData, heroSlides, settings] = await Promise.all([
     getProducts(),
     getSaleProducts(),
-    getSpecialOfferProduct(),
+    getSpecialOffer(),
     getHeroPromos(),
     getSettings(),
   ]);
 
-  const specialOffer = specialOfferProduct ? {
+  const specialOffer = specialOfferData ? {
     product: {
-      id: specialOfferProduct.id,
-      name: specialOfferProduct.name,
-      slug: specialOfferProduct.slug,
-      price: specialOfferProduct.price,
-      salePrice: specialOfferProduct.salePrice,
-      images: parseImages(specialOfferProduct.images),
-      stock: specialOfferProduct.stock,
+      id: specialOfferData.product.id,
+      name: specialOfferData.product.name,
+      slug: specialOfferData.product.slug,
+      price: specialOfferData.product.price,
+      salePrice: specialOfferData.product.salePrice,
+      images: parseImages(specialOfferData.product.images),
+      stock: specialOfferData.product.stock,
     },
-    endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-    discountPercent: specialOfferProduct.salePrice
-      ? Math.round(((specialOfferProduct.price - specialOfferProduct.salePrice) / specialOfferProduct.price) * 100)
-      : 0,
+    endDate: new Date(specialOfferData.endDate),
+    discountPercent: specialOfferData.discountPercent,
   } : null;
 
   return (
