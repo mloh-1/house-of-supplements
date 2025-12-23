@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Heart, ShoppingCart, Eye, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice, calculateDiscount } from "@/lib/utils";
-import { useCartStore } from "@/store/cart";
 import { useWishlistStore } from "@/store/wishlist";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
@@ -32,8 +32,8 @@ interface ProductCardProps {
 
 export function ProductCard({ product, className }: ProductCardProps) {
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
   const { data: session, status } = useSession();
-  const addItem = useCartStore((state) => state.addItem);
   const addToWishlist = useWishlistStore((state) => state.addItem);
   const removeFromWishlist = useWishlistStore((state) => state.removeItem);
   const isInWishlist = useWishlistStore((state) => state.isInWishlist);
@@ -53,25 +53,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
     setMounted(true);
   }, []);
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleViewProduct = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    if (isOutOfStock) return;
-
-    addItem({
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      salePrice: product.salePrice || undefined,
-      image: product.images[0] || "/placeholder.jpg",
-      quantity: 1,
-    });
-
-    toast({
-      title: "Dodato u korpu",
-      description: `${product.name} je dodat u vašu korpu.`,
-    });
+    router.push(`/proizvod/${product.slug}`);
   };
 
   const handleWishlist = (e: React.MouseEvent) => {
@@ -165,15 +150,14 @@ export function ProductCard({ product, className }: ProductCardProps) {
             </Button>
           </div>
 
-          {/* Add to cart button - appears on hover */}
+          {/* View product button - appears on hover */}
           <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-4 group-hover:translate-y-0">
             <Button
               className="w-full bg-lime hover:bg-lime-500 text-black font-bold uppercase tracking-wider rounded-none"
-              onClick={handleAddToCart}
-              disabled={isOutOfStock}
+              onClick={handleViewProduct}
             >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              {isOutOfStock ? "Rasprodato" : "Dodaj u korpu"}
+              <Eye className="h-4 w-4 mr-2" />
+              {isOutOfStock ? "Rasprodato" : "Pogledaj proizvod"}
             </Button>
           </div>
         </div>

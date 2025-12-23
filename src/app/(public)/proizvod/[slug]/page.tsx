@@ -204,6 +204,7 @@ export default function ProductPage() {
 
     addItem({
       productId: product.id,
+      slug: product.slug,
       name: product.name,
       price: product.price,
       salePrice: product.salePrice || undefined,

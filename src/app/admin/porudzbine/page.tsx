@@ -421,7 +421,23 @@ export default function OrdersPage() {
                 </h3>
                 <div className="space-y-2">
                   {selectedOrder.items.map((item) => {
-                    const variant = item.variantInfo ? JSON.parse(item.variantInfo) : null;
+                    // Parse variant info - can be new format { info, variantId } or old format { name, value }
+                    let variantDisplay: string | null = null;
+                    if (item.variantInfo) {
+                      try {
+                        const parsed = JSON.parse(item.variantInfo);
+                        if (parsed.info) {
+                          // New format: { info: "Ukus: Čokolada, Veličina: XL", variantId: "..." }
+                          variantDisplay = parsed.info;
+                        } else if (parsed.name && parsed.value) {
+                          // Old format: { name: "Ukus", value: "Čokolada" }
+                          variantDisplay = `${parsed.name}: ${parsed.value}`;
+                        }
+                      } catch {
+                        // If parsing fails, use raw string
+                        variantDisplay = item.variantInfo;
+                      }
+                    }
                     return (
                       <div
                         key={item.id}
@@ -429,10 +445,8 @@ export default function OrdersPage() {
                       >
                         <div>
                           <p className="text-white font-medium">{item.product.name}</p>
-                          {variant && (
-                            <p className="text-zinc-500 text-sm">
-                              {variant.name}: {variant.value}
-                            </p>
+                          {variantDisplay && (
+                            <p className="text-zinc-500 text-sm">{variantDisplay}</p>
                           )}
                         </div>
                         <div className="text-right">

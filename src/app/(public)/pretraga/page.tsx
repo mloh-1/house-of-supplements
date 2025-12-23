@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, ShoppingCart, Package } from "lucide-react";
+import { Search, Eye, Package } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-import { useCartStore } from "@/store/cart";
 import { Button } from "@/components/ui/button";
 
 interface Product {
@@ -23,11 +22,11 @@ interface Product {
 
 function SearchContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const query = searchParams.get("q") || "";
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const addItem = useCartStore((state) => state.addItem);
 
   useEffect(() => {
     if (query.length >= 2) {
@@ -50,15 +49,8 @@ function SearchContent() {
     }
   }, [query]);
 
-  const handleAddToCart = (product: Product) => {
-    addItem({
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      salePrice: product.salePrice || undefined,
-      image: product.images[0] || "/placeholder.jpg",
-      quantity: 1,
-    });
+  const handleViewProduct = (product: Product) => {
+    router.push(`/proizvod/${product.slug}`);
   };
 
   return (
@@ -191,11 +183,10 @@ function SearchContent() {
                     </div>
                     <Button
                       size="icon"
-                      onClick={() => handleAddToCart(product)}
-                      disabled={!product.inStock}
-                      className="h-9 w-9 bg-lime text-black hover:bg-lime-400 disabled:opacity-50"
+                      onClick={() => handleViewProduct(product)}
+                      className="h-9 w-9 bg-lime text-black hover:bg-lime-400"
                     >
-                      <ShoppingCart className="h-4 w-4" />
+                      <Eye className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

@@ -133,7 +133,7 @@ export default function CartPage() {
               >
                 <div className="flex gap-4">
                   <Link
-                    href={`/proizvod/${item.productId}`}
+                    href={`/proizvod/${item.slug}`}
                     className="relative w-24 h-24 md:w-32 md:h-32 bg-black border border-zinc-800 flex-shrink-0 overflow-hidden group"
                   >
                     <Image
@@ -148,7 +148,7 @@ export default function CartPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <Link
-                          href={`/proizvod/${item.productId}`}
+                          href={`/proizvod/${item.slug}`}
                           className="font-bold text-white hover:text-lime transition-colors line-clamp-2"
                         >
                           {item.name}
