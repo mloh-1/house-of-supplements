@@ -82,11 +82,13 @@ export async function POST(request: Request) {
         status: "PRIMLJENO",
         notes: notes || null,
         items: {
-          create: items.map((item: { productId: string; quantity: number; price: number; variant?: { name: string; value: string } }) => ({
+          create: items.map((item: { productId: string; quantity: number; price: number; variantInfo?: string; variantId?: string }) => ({
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
-            variantInfo: item.variant ? JSON.stringify(item.variant) : null,
+            variantInfo: item.variantInfo || item.variantId
+              ? JSON.stringify({ info: item.variantInfo, variantId: item.variantId })
+              : null,
           })),
         },
       },

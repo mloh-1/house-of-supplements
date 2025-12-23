@@ -51,6 +51,17 @@ export async function PATCH(
     const oldStatus = order.status;
     const newStatus = status;
 
+    // Helper to parse variant info and get variantId
+    const getVariantId = (variantInfo: string | null): string | null => {
+      if (!variantInfo) return null;
+      try {
+        const parsed = JSON.parse(variantInfo);
+        return parsed.variantId || null;
+      } catch {
+        return null;
+      }
+    };
+
     // Stock management logic
     // Decrement stock when changing TO "POSLATO" (from PRIMLJENO)
     if (oldStatus === "PRIMLJENO" && newStatus === "POSLATO") {
@@ -74,10 +85,27 @@ export async function PATCH(
             { status: 400 }
           );
         }
+
+        // Also check variant stock if applicable
+        const variantId = getVariantId(item.variantInfo);
+        if (variantId) {
+          const variant = await db.productVariant.findUnique({
+            where: { id: variantId },
+            select: { stock: true, value: true },
+          });
+
+          if (variant && variant.stock < item.quantity) {
+            return NextResponse.json(
+              { error: `Nema dovoljno varijante "${variant.value}" na stanju (dostupno: ${variant.stock}, potrebno: ${item.quantity})` },
+              { status: 400 }
+            );
+          }
+        }
       }
 
       // Decrement stock for all items
       for (const item of order.items) {
+        // Decrement product stock
         await db.product.update({
           where: { id: item.productId },
           data: {
@@ -86,6 +114,19 @@ export async function PATCH(
             },
           },
         });
+
+        // Decrement variant stock if applicable
+        const variantId = getVariantId(item.variantInfo);
+        if (variantId) {
+          await db.productVariant.update({
+            where: { id: variantId },
+            data: {
+              stock: {
+                decrement: item.quantity,
+              },
+            },
+          });
+        }
       }
     }
 
@@ -93,6 +134,7 @@ export async function PATCH(
     if ((oldStatus === "POSLATO" || oldStatus === "ISPORUCENO") && newStatus === "OTKAZANO") {
       // Restore stock for all items
       for (const item of order.items) {
+        // Restore product stock
         await db.product.update({
           where: { id: item.productId },
           data: {
@@ -101,6 +143,19 @@ export async function PATCH(
             },
           },
         });
+
+        // Restore variant stock if applicable
+        const variantId = getVariantId(item.variantInfo);
+        if (variantId) {
+          await db.productVariant.update({
+            where: { id: variantId },
+            data: {
+              stock: {
+                increment: item.quantity,
+              },
+            },
+          });
+        }
       }
     }
 

@@ -187,8 +187,21 @@ export async function POST(request: Request) {
     if (variants && Array.isArray(variants) && variants.length > 0) {
       const variantRecords = [];
       for (const variant of variants) {
-        if (variant.name && variant.value) {
-          // Split comma-separated values into individual variant options
+        // New format: { name: string, options: [{ value: string, stock: number }] }
+        if (variant.name && variant.options && Array.isArray(variant.options)) {
+          for (const option of variant.options) {
+            if (option.value) {
+              variantRecords.push({
+                productId: product.id,
+                name: variant.name,
+                value: option.value,
+                stock: option.stock || 0,
+              });
+            }
+          }
+        }
+        // Legacy format: { name: string, value: string (comma-separated) }
+        else if (variant.name && variant.value) {
           const values = variant.value.split(",").map((v: string) => v.trim()).filter(Boolean);
           for (const value of values) {
             variantRecords.push({

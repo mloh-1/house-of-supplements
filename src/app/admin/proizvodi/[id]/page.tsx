@@ -188,6 +188,40 @@ export default function EditProductPage() {
     setVariants(variants.map((v, i) => i === index ? { ...v, [field]: value } : v));
   };
 
+  // Validate that variant stocks match product stock per category
+  const validateVariantStocks = (): string | null => {
+    const activeVariants = variants.filter(v => !v.isDeleted && v.name && v.value);
+    if (activeVariants.length === 0) return null;
+
+    const productStock = parseInt(formData.stock) || 0;
+
+    // Group by variant category name
+    const categoriesMap = new Map<string, number>();
+    for (const v of activeVariants) {
+      const currentTotal = categoriesMap.get(v.name) || 0;
+      categoriesMap.set(v.name, currentTotal + (v.stock || 0));
+    }
+
+    // Check if all categories have the same total
+    const categoryTotals = Array.from(categoriesMap.entries());
+    if (categoryTotals.length > 1) {
+      const firstTotal = categoryTotals[0][1];
+      for (const [name, total] of categoryTotals) {
+        if (total !== firstTotal) {
+          return `Sve kategorije varijanti moraju imati isti ukupan broj na stanju. "${name}" ima ${total}, a "${categoryTotals[0][0]}" ima ${firstTotal}.`;
+        }
+      }
+    }
+
+    // Check if total matches product stock
+    const firstCategoryTotal = categoryTotals[0]?.[1] || 0;
+    if (firstCategoryTotal !== productStock) {
+      return `Zbir zaliha varijanti (${firstCategoryTotal}) mora biti jednak ukupnoj količini proizvoda (${productStock}).`;
+    }
+
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -195,6 +229,14 @@ export default function EditProductPage() {
 
     if (!formData.name || !formData.price || !formData.categoryId) {
       setError("Naziv, cena i kategorija su obavezni");
+      setSaving(false);
+      return;
+    }
+
+    // Validate variant stocks
+    const variantError = validateVariantStocks();
+    if (variantError) {
+      setError(variantError);
       setSaving(false);
       return;
     }

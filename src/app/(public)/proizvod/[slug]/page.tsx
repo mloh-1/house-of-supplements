@@ -163,6 +163,25 @@ export default function ProductPage() {
     ? variantNames.map(name => `${name}: ${selectedVariants[name]}`).join(", ")
     : undefined;
 
+  // Find the selected variant ID (for single variant category products)
+  const getSelectedVariantId = (): string | undefined => {
+    if (variantNames.length === 0 || !allVariantsSelected) return undefined;
+
+    // For products with a single variant category, find the variant ID
+    if (variantNames.length === 1) {
+      const variantName = variantNames[0];
+      const selectedValue = selectedVariants[variantName];
+      const variant = product.variants[variantName]?.find(v => v.value === selectedValue);
+      return variant?.id;
+    }
+
+    // For products with multiple variant categories, we can't track individual variant stock
+    // In this case, we only track main product stock
+    return undefined;
+  };
+
+  const selectedVariantId = getSelectedVariantId();
+
   const handleAddToCart = () => {
     if (!product.inStock) {
       toast({
@@ -191,6 +210,7 @@ export default function ProductPage() {
       image: product.images[0] || "/placeholder-product.jpg",
       quantity,
       variantInfo,
+      variantId: selectedVariantId,
     });
 
     toast({
