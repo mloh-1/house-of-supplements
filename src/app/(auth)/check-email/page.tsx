@@ -1,9 +1,47 @@
 "use client";
 
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Mail, ArrowLeft } from "lucide-react";
+import { Mail, ArrowLeft, RefreshCw, Check } from "lucide-react";
 
 export default function CheckEmailPage() {
+  const searchParams = useSearchParams();
+  const email = searchParams.get("email");
+
+  const [isResending, setIsResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [resendError, setResendError] = useState("");
+
+  const handleResend = async () => {
+    if (!email || isResending) return;
+
+    setIsResending(true);
+    setResendError("");
+    setResendSuccess(false);
+
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setResendError(data.error || "Došlo je do greške");
+        return;
+      }
+
+      setResendSuccess(true);
+    } catch {
+      setResendError("Došlo je do greške. Pokušajte ponovo.");
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background effects */}
@@ -50,12 +88,48 @@ export default function CheckEmailPage() {
               Molimo proverite vašu inbox i spam folder.
             </p>
 
+            {email && (
+              <div className="bg-zinc-800/50 border border-zinc-700 p-4 mb-4">
+                <p className="text-zinc-400 text-sm mb-1">Email poslat na:</p>
+                <p className="text-lime font-medium">{email}</p>
+              </div>
+            )}
+
             <div className="bg-zinc-800/50 border border-zinc-700 p-4 mb-6">
               <p className="text-zinc-500 text-sm">
                 Link za potvrdu ističe za <span className="text-lime font-bold">24 sata</span>.
-                Ako ne primite email, proverite spam folder ili se registrujte ponovo.
               </p>
             </div>
+
+            {/* Resend section */}
+            {email && (
+              <div className="mb-6">
+                {resendSuccess ? (
+                  <div className="flex items-center justify-center gap-2 text-lime bg-lime/10 border border-lime/30 py-3 px-4">
+                    <Check className="w-4 h-4" />
+                    <span className="text-sm">Email je ponovo poslat!</span>
+                  </div>
+                ) : (
+                  <>
+                    {resendError && (
+                      <div className="text-red-400 bg-red-500/10 border border-red-500/30 py-2 px-4 mb-3 text-sm">
+                        {resendError}
+                      </div>
+                    )}
+                    <button
+                      onClick={handleResend}
+                      disabled={isResending}
+                      className="flex items-center justify-center gap-2 w-full border border-zinc-700 text-zinc-300 py-3 px-4 hover:border-lime hover:text-lime transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isResending ? "animate-spin" : ""}`} />
+                      <span className="text-sm">
+                        {isResending ? "Slanje..." : "Pošalji email ponovo"}
+                      </span>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="space-y-3">
               <Link

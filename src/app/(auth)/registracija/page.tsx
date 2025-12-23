@@ -68,8 +68,8 @@ export default function RegistracijaPage() {
         return;
       }
 
-      // Redirect to check email page
-      router.push("/check-email");
+      // Redirect to check email page with email for resend functionality
+      router.push(`/check-email?email=${encodeURIComponent(formData.email)}`);
     } catch {
       setError("Došlo je do greške. Pokušajte ponovo.");
     } finally {
